@@ -1,30 +1,76 @@
-#!/usr/bin/python3
+#!./venv/bin/python3
 
 import datetime
+
+
+from rich.console import Console
+from rich.table import Table
+
 
 DATA = {}
 TRANSACTIONS = {}
 
 
 def new_transaction(query):
-    new_id = len(TRANSACTIONS.keys())
+    new_id = str(len(TRANSACTIONS.keys()))
     if TRANSACTIONS.get(new_id):
         raise Exception(f"{new_id} transaction should not already exist")
 
-    tx = {"id": new_id, "timestamp": datetime.datetime.now(), "request": query, "user": "aaron", "client": "jql"}
+    tx = {"id": new_id, "timestamp": str(datetime.datetime.now().timestamp())[:-3], "request": query, "user": "aaron", "client": "jql"}
     TRANSACTIONS[new_id] = tx
     return tx
 
 
-def print_item(item):
-    print(f"id: {item['db']['id']}")
-    print(f"tags: {', '.join(item.keys())}")
-    for tag in item.keys():
-        if len(item[tag].keys()):
-            for fact in item[tag].keys():
-                print(f"#{tag}/{fact}={item[tag][fact]}")
+def new_item(tx):
+    new_id = str(len(DATA.keys()))
+    if DATA.get(new_id):
+        raise Exception(f"{new_id} should not already exist")
+
+    DATA[new_id] = []
+    new_fact(new_id, 'db', None, None, tx)
+    return new_id
+
+
+def get_tags(id):
+    facts = DATA[id]
+    return set(f[0] for f in facts if f[1] is None)
+
+
+def new_fact(id, tag, fact, value, tx):
+    # If we are adding a fact, check if already has the tag set or not
+    if fact is not None and tag not in get_tags(id):
+        t = (tag, None, None, tx.get('id'), tx.get('timestamp'))
+        DATA[id].append(t)
+
+    f = (tag, fact, value, tx.get('id'), tx.get('timestamp'))
+    DATA[id].append(f)
+
+
+def print_item(id):
+    facts = DATA[id]
+    tags = get_tags(id)
+
+    table = Table(title=f"id: {id} tags: {', '.join(tags)}")
+    table.add_column("id")
+    table.add_column("tx")
+    table.add_column("fact")
+    table.add_column("value")
+    table.add_column("created")
+
+    for f in facts:
+        tag, fact, value, tx, created = f
+        if fact:
+            fact = f'#{tag}/{fact}'
         else:
-            print(f"#{tag}")
+            fact = f'#{tag}'
+
+        table.add_row(id, tx, fact, "" if value is None else str(value), created)
+#        if fact:
+#            print(f"tx:{tx}\t#{tag}\t{fact}\t{value}")
+#        else:
+#            print(f"tx:{tx}\t#{tag}")
+
+    Console().print(table)
 
 
 def q(query):
@@ -77,22 +123,21 @@ def q(query):
 
     if action == 'create':
         tx = new_transaction(query)
+        id = new_item(tx)
 
-        new_id = len(DATA.keys())
-        if DATA.get(new_id):
-            raise Exception(f"{new_id} should not already exist")
+        for tag in values.keys():
+            if tag == "db":
+                if "id" in values["db"] or "tx" in values["db"]:
+                    raise Exception("Cannot hardcode db/tx or db/id")
 
-        if "id" in values["db"] or "tx" in values["db"]:
-            raise Exception("Cannot hardcode db/tx or db/id")
+            if not len(values[tag].keys()):
+                new_fact(id, tag, None, None, tx)
+                continue
 
-        data = values.copy()
-        data["db"]["id"] = new_id
-        data["db"]["tx"] = tx.get('id')
-        DATA[new_id] = data
+            for fact in values[tag].keys():
+                new_fact(id, tag, fact, values[tag][fact], tx)
 
-        NO CREATE AS FACT TUPLES
-
-        print_item(data)
+        print_item(id)
         print()
 
 
