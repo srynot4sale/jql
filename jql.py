@@ -87,12 +87,21 @@ def q(query):
                 raw.append(' '.join(curr))
                 curr = []
             raw.append(token)
+        elif token.startswith('@'):
+            if curr:
+                raw.append(' '.join(curr))
+                curr = []
+            raw.append(token)
         else:
             curr.append(token)
     if curr:
         raw.append(' '.join(curr))
 
     for r in raw:
+        if r.startswith('@'):
+            values.append((None, None, r.lstrip('@')))
+            continue
+
         if not r.startswith('#'):
             values.append(("db", "content", r))
             continue
@@ -126,6 +135,9 @@ def q(query):
             raise Exception("No data supplied")
 
         for tag, fact, value in values:
+            if tag is None and fact is None:
+                raise Exception("Not accepting ID's in a create")
+
             if tag == "db" and fact in ("id", "tx"):
                 raise Exception("Cannot hardcode db/tx or db/id")
 
@@ -135,31 +147,65 @@ def q(query):
         print(f"Created @{id}")
         print()
 
+    if action == 'set':
+        tx = new_transaction(query)
+
+        if len(values) < 2:
+            raise Exception("No data supplied")
+
+        if values[0][0] is not None and values[0][1] is not None:
+            raise Exception(f"Expected an ID first - got {values[0]}")
+
+        _, _, id = values[0]
+        if id not in DATA.keys():
+            raise Exception(f"Cannot find @{id}")
+
+        for tag, fact, value in values[1:]:
+            if tag == "db" and fact in ("id", "tx"):
+                raise Exception("Cannot hardcode db/tx or db/id")
+
+            new_fact(id, tag, fact, value, tx)
+
+        print_item(id)
+        print(f"Updated @{id}")
+        print()
 
 
 
-q("CREATE go to supermarket #todo #todo/completed")
-q("CREATE do dishes #todo #chores")
-q("CREATE book appointment #todo #todo/remind_at=20210412")
+examples = [
+    "CREATE go to supermarket #todo #todo/completed",
+    "CREATE do dishes #todo #chores",
+    "CREATE book appointment #todo #todo/remind_at=20210412",
+    "SET @1 #todo/completed",
+    "SET @2 book appointment at physio"
+]
 
-#import sys
-#sys.exit()
+for ex in examples:
+    q(ex)
 
 
 session = PromptSession()
 
 print('Welcome to JQL')
-print('q to quit')
+print('q to quit, h for help')
 while True:
     i = session.prompt('> ')
     if i == "q":
         print('Quitting')
         break
 
+    if i == "h":
+        print('Examples:')
+        for ex in examples:
+            print(f"- {ex}")
+        print()
+        continue
+
     try:
         q(i)
     except BaseException as e:
-        print(f"Error occured: {e}")
+        print(f"Error occured: [{e.__class__.__name__}] {e}")
+        raise
 
 
 import pprint
