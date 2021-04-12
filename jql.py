@@ -33,14 +33,13 @@ def new_item(tx):
     return new_id
 
 
-def get_tags(id):
-    facts = DATA[id]
+def get_tags(facts):
     return set(f[0] for f in facts if f[1] is None)
 
 
 def new_fact(id, tag, fact, value, tx):
     # If we are adding a fact, check if already has the tag set or not
-    if fact is not None and tag not in get_tags(id):
+    if fact is not None and tag not in get_tags(get_item(id)):
         t = (tag, None, None, tx.get('id'), tx.get('timestamp'))
         DATA[id].append(t)
 
@@ -48,11 +47,53 @@ def new_fact(id, tag, fact, value, tx):
     DATA[id].append(f)
 
 
-def print_item(id):
-    facts = DATA[id]
-    tags = get_tags(id)
+def summary_item(id):
+    content = None
+    facts = []
+    for f in get_item(id):
+        tag, fact, value, _, _ = f
+        if tag == "db":
+            if fact == "content":
+                content = value
+            continue
+        if fact:
+            if value is True:
+                facts.append(f'#{tag}/{fact}')
+            else:
+                facts.append(f'#{tag}/{fact}={value}')
+        else:
+            facts.append(f'#{tag}')
 
-    table = Table(title=f"id: {id} tags: {', '.join(tags)}")
+    if content is not None:
+        facts.insert(0, content)
+
+    return f"@{id} {' '.join(facts)}"
+
+
+def get_item(id, history=False):
+    all_facts = DATA[id]
+
+    if history:
+        facts = all_facts
+    else:
+        sorted_facts = {}
+        for f in all_facts:
+            i = f"{f[0]}/{f[1]}"
+            if i in sorted_facts.keys():
+                # If existing tx is newer, don't update
+                if sorted_facts[i][3] > f[3]:
+                    continue
+            sorted_facts[i] = f
+        facts = sorted_facts.values()
+
+    return facts
+
+
+def print_item(id, history=False):
+    facts = get_item(id, history)
+    tags = get_tags(facts)
+
+    table = Table(title=summary_item(id))
     table.add_column("id")
     table.add_column("tx")
     table.add_column("fact")
@@ -68,6 +109,7 @@ def print_item(id):
 
         table.add_row(id, tx, fact, "" if value is None else str(value), created)
 
+    print()
     Console().print(table)
 
 
@@ -170,14 +212,42 @@ def q(query):
         print(f"Updated @{id}")
         print()
 
+    if action == 'history':
+        if not values:
+            raise Exception("No data supplied")
 
+        if values[0][0] is not None and values[0][1] is not None:
+            raise Exception(f"Expected an ID first - got {values[0]}")
+
+        _, _, id = values[0]
+        if id not in DATA.keys():
+            raise Exception(f"Cannot find @{id}")
+
+        print_item(id, history=True)
+        print()
+
+    if action == 'get':
+        if not values:
+            raise Exception("No data supplied")
+
+        if values[0][0] is not None and values[0][1] is not None:
+            raise Exception(f"Expected an ID first - got {values[0]}")
+
+        _, _, id = values[0]
+        if id not in DATA.keys():
+            raise Exception(f"Cannot find @{id}")
+
+        print_item(id)
+        print()
 
 examples = [
     "CREATE go to supermarket #todo #todo/completed",
     "CREATE do dishes #todo #chores",
     "CREATE book appointment #todo #todo/remind_at=20210412",
     "SET @1 #todo/completed",
-    "SET @2 book appointment at physio"
+    "SET @2 book appointment at physio",
+    "GET @2",
+    "HISTORY @2",
 ]
 
 for ex in examples:
