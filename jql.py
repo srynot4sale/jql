@@ -5,6 +5,8 @@ import datetime
 
 from rich.console import Console
 from rich.table import Table
+from prompt_toolkit import print_formatted_text as print
+from prompt_toolkit import PromptSession
 
 
 DATA = {}
@@ -125,6 +127,9 @@ def q(query):
         tx = new_transaction(query)
         id = new_item(tx)
 
+        if values == {'db': {}}:
+            raise Exception("No data supplied")
+
         for tag in values.keys():
             if tag == "db":
                 if "id" in values["db"] or "tx" in values["db"]:
@@ -138,9 +143,8 @@ def q(query):
                 new_fact(id, tag, fact, values[tag][fact], tx)
 
         print_item(id)
+        print(f"Created @{id}")
         print()
-
-
 
 
 
@@ -149,20 +153,29 @@ q("CREATE go to supermarket #todo #todo/completed")
 q("CREATE do dishes #todo #chores")
 q("CREATE book appointment #todo #todo/remind_at=20210412")
 
+#import sys
+#sys.exit()
+
+
+session = PromptSession()
+
+print('Welcome to JQL')
+print('q to quit')
+while True:
+    i = session.prompt('> ')
+    if i == "q":
+        print('Quitting')
+        break
+
+    try:
+        q(i)
+    except BaseException as e:
+        print(f"Error occured: {e}")
+
+
 import pprint
 print('TRANSACTIONS')
 pprint.pprint(TRANSACTIONS)
 print('DATA')
 pprint.pprint(DATA)
 
-import sys
-sys.exit()
-
-
-from prompt_toolkit import print_formatted_text as print
-from prompt_toolkit import PromptSession
-
-session = PromptSession()
-
-print('Welcome to JQL')
-session.prompt()
