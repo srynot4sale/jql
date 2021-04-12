@@ -67,10 +67,6 @@ def print_item(id):
             fact = f'#{tag}'
 
         table.add_row(id, tx, fact, "" if value is None else str(value), created)
-#        if fact:
-#            print(f"tx:{tx}\t#{tag}\t{fact}\t{value}")
-#        else:
-#            print(f"tx:{tx}\t#{tag}")
 
     Console().print(table)
 
@@ -84,7 +80,7 @@ def q(query):
 
     raw = []
     curr = []
-    values = {"db": {}}
+    values = []
     for token in tokens[1:]:
         if token.startswith('#'):
             if curr:
@@ -98,7 +94,7 @@ def q(query):
 
     for r in raw:
         if not r.startswith('#'):
-            values["db"]["content"] = r
+            values.append(("db", "content", r))
             continue
 
         if "/" in r:
@@ -108,15 +104,14 @@ def q(query):
             fact = None
 
         tag = tag.lstrip('#')
-        if tag not in values.keys():
-            values[tag] = {}
-
-        if fact is not None:
+        if fact is None:
+            values.append((tag, None, None))
+        else:
             if '=' in fact:
                 f, v = fact.split('=', 1)
-                values[tag][f] = v
+                values.append((tag, f, v))
             else:
-                values[tag][fact] = True
+                values.append((tag, fact, True))
 
 
     #print(f'action: {action}')
@@ -127,20 +122,14 @@ def q(query):
         tx = new_transaction(query)
         id = new_item(tx)
 
-        if values == {'db': {}}:
+        if not values:
             raise Exception("No data supplied")
 
-        for tag in values.keys():
-            if tag == "db":
-                if "id" in values["db"] or "tx" in values["db"]:
-                    raise Exception("Cannot hardcode db/tx or db/id")
+        for tag, fact, value in values:
+            if tag == "db" and fact in ("id", "tx"):
+                raise Exception("Cannot hardcode db/tx or db/id")
 
-            if not len(values[tag].keys()):
-                new_fact(id, tag, None, None, tx)
-                continue
-
-            for fact in values[tag].keys():
-                new_fact(id, tag, fact, values[tag][fact], tx)
+            new_fact(id, tag, fact, value, tx)
 
         print_item(id)
         print(f"Created @{id}")
