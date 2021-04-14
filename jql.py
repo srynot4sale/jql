@@ -1,5 +1,6 @@
 #!./venv/bin/python3
 
+from dataclasses import dataclass
 import datetime
 
 
@@ -12,13 +13,48 @@ from prompt_toolkit import PromptSession
 DATA = {}
 TRANSACTIONS = {}
 
+@dataclass
+class Transaction:
+    id: str
+    timestamp: str
+    request: str
+    user: str
+    client: str
+
+
+@dataclass
+class Fact:
+    id: str
+    tag: str
+    fact: str
+    value: str
+    tx: str
+    created: str
+
+    def get_key(self):
+        return f"{self.tag}{'/'+self.fact if self.fact is not None else ''}"
+
+    def is_content(self):
+        return self.tag == "db" and self.fact == "content"
+
+    def as_string(self):
+        if self.is_content():
+            return self.value
+        if self.fact:
+            if self.value is True:
+                return f'#{self.tag}/{self.fact}'
+            else:
+                return f'#{self.tag}/{self.fact}={self.value}'
+        else:
+            return f'#{self.tag}'
+
 
 def new_transaction(query):
     new_id = str(len(TRANSACTIONS.keys()))
     if TRANSACTIONS.get(new_id):
         raise Exception(f"{new_id} transaction should not already exist")
 
-    tx = {"id": new_id, "timestamp": str(datetime.datetime.now().timestamp())[:-3], "request": query, "user": "aaron", "client": "jql"}
+    tx = Transaction(id=new_id, timestamp=str(datetime.datetime.now().timestamp())[:-3], request=query, user="aaron", client="jql")
     TRANSACTIONS[new_id] = tx
     return tx
 
@@ -34,16 +70,16 @@ def new_item(tx):
 
 
 def get_tags(facts):
-    return set(f[0] for f in facts if f[1] is None)
+    return set(f.tag for f in facts if f.fact is None)
 
 
 def new_fact(id, tag, fact, value, tx):
     # If we are adding a fact, check if already has the tag set or not
     if fact is not None and tag not in get_tags(get_item(id)):
-        t = (tag, None, None, tx.get('id'), tx.get('timestamp'))
+        t = Fact(id=id, tag=tag, fact=None, value=None, tx=tx.id, created=tx.timestamp)
         DATA[id].append(t)
 
-    f = (tag, fact, value, tx.get('id'), tx.get('timestamp'))
+    f = Fact(id=id, tag=tag, fact=fact, value=value, tx=tx.id, created=tx.timestamp)
     DATA[id].append(f)
 
 
@@ -51,18 +87,10 @@ def summary_item(id):
     content = None
     facts = []
     for f in get_item(id):
-        tag, fact, value, _, _ = f
-        if tag == "db":
-            if fact == "content":
-                content = value
-            continue
-        if fact:
-            if value is True:
-                facts.append(f'#{tag}/{fact}')
-            else:
-                facts.append(f'#{tag}/{fact}={value}')
+        if f.is_content():
+            content = f.as_string()
         else:
-            facts.append(f'#{tag}')
+            facts.append(f.as_string())
 
     if content is not None:
         facts.insert(0, content)
@@ -78,12 +106,11 @@ def get_item(id, history=False):
     else:
         sorted_facts = {}
         for f in all_facts:
-            i = f"{f[0]}/{f[1]}"
-            if i in sorted_facts.keys():
+            if f.get_key() in sorted_facts.keys():
                 # If existing tx is newer, don't update
-                if sorted_facts[i][3] > f[3]:
+                if sorted_facts[f.get_key()].tx > f.tx:
                     continue
-            sorted_facts[i] = f
+            sorted_facts[f.get_key()] = f
         facts = sorted_facts.values()
 
     return facts
@@ -101,13 +128,7 @@ def print_item(id, history=False):
     table.add_column("created")
 
     for f in facts:
-        tag, fact, value, tx, created = f
-        if fact:
-            fact = f'#{tag}/{fact}'
-        else:
-            fact = f'#{tag}'
-
-        table.add_row(id, tx, fact, "" if value is None else str(value), created)
+        table.add_row(id, f.tx, f.get_key(), "" if f.value is None else str(f.value), f.created)
 
     print()
     Console().print(table)
@@ -240,6 +261,56 @@ def q(query):
         print_item(id)
         print()
 
+    if action == 'list':
+        if not values:
+            raise Exception("No data supplied")
+
+        display = []
+        for val in values:
+            t, f, v = val
+            if t == "db" and f == "content":
+                display.append(v)
+            if t is None:
+                raise Exception("Can't list an ID")
+            elif f is None:
+                display.append(f'#{t}')
+            elif v is None:
+                display.append(f'#{t}/{f}')
+            else:
+                display.append(f'#{t}/{f}={v}')
+
+        table = Table(title=f"List all items matching the search terms: {' '.join(display)}")
+        table.add_column("item")
+
+        # Check each data item as a current fact that matches every search term
+        for id in DATA.keys():
+            notfound = False
+            facts = get_item(id)
+            for val in values:
+                if notfound:
+                    break
+                t, f, v = val
+                match = False
+                for fact in facts:
+                    if t == fact.tag and f == fact.fact and v == fact.value:
+                        match = True
+                        #print(f"Match {val=} == {fact=}")
+                        break
+                    else:
+                        #print(f"No match {val=} != {fact=}")
+                        pass
+                if not match:
+                    notfound = True
+
+            if not notfound:
+                table.add_row(summary_item(id))
+
+        print()
+        Console().print(table)
+        print()
+
+
+
 examples = [
     "CREATE go to supermarket #todo #todo/completed",
     "CREATE do dishes #todo #chores",
@@ -248,6 +319,8 @@ examples = [
     "SET @2 book appointment at physio",
     "GET @2",
     "HISTORY @2",
+    "LIST #todo/completed",
+    "LIST do dishes",
 ]
 
 for ex in examples:
