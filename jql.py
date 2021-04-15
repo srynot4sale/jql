@@ -106,7 +106,7 @@ def summary_item(id):
     if content is not None:
         facts.insert(0, content)
 
-    return f"[deep_sky_blue1]@{id}[/deep_sky_blue1] {' '.join(facts)}"
+    return f"[deep_sky_blue1][bold]@[/bold]{id}[/deep_sky_blue1] {' '.join(facts)}"
 
 
 def get_item(id, history=False):
