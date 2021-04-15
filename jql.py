@@ -5,10 +5,11 @@ import datetime
 
 
 from rich.console import Console
+from rich.prompt import Prompt
 from rich.table import Table
-from prompt_toolkit import print_formatted_text as print
-from prompt_toolkit import PromptSession
 
+console = Console()
+print = console.print
 
 DATA = {}
 TRANSACTIONS = {}
@@ -48,6 +49,16 @@ class Fact:
         else:
             return f'#{self.tag}'
 
+    def as_markedup_string(self):
+        if self.is_content():
+            return self.as_string()
+        if self.fact:
+            if self.value is True:
+                return f'[green][bold]#[/bold]{self.tag}[/green]/[orange1]{self.fact}[/orange1]'
+            else:
+                return f'[green][bold]#[/bold]{self.tag}[/green]/[orange1]{self.fact}[/orange1]=[yellow]{self.value}[/yellow]'
+        else:
+            return f'[green][bold]#[/bold]{self.tag}[/green]'
 
 def new_transaction(query):
     new_id = str(len(TRANSACTIONS.keys()))
@@ -90,12 +101,12 @@ def summary_item(id):
         if f.is_content():
             content = f.as_string()
         else:
-            facts.append(f.as_string())
+            facts.append(f.as_markedup_string())
 
     if content is not None:
         facts.insert(0, content)
 
-    return f"@{id} {' '.join(facts)}"
+    return f"[deep_sky_blue1]@{id}[/deep_sky_blue1] {' '.join(facts)}"
 
 
 def get_item(id, history=False):
@@ -131,7 +142,7 @@ def print_item(id, history=False):
         table.add_row(id, f.tx, f.get_key(), "" if f.value is None else str(f.value), f.created)
 
     print()
-    Console().print(table)
+    print(table)
 
 
 def q(query):
@@ -306,7 +317,7 @@ def q(query):
                 table.add_row(summary_item(id))
 
         print()
-        Console().print(table)
+        print(table)
         print()
 
 
@@ -327,28 +338,26 @@ for ex in examples:
     q(ex)
 
 
-session = PromptSession()
 
 print('Welcome to JQL')
 print('q to quit, h for help')
 while True:
-    i = session.prompt('> ')
-    if i == "q":
-        print('Quitting')
-        break
-
-    if i == "h":
-        print('Examples:')
-        for ex in examples:
-            print(f"- {ex}")
-        print()
-        continue
-
     try:
+        i = Prompt.ask('')
+        if i == "q":
+            print('Quitting')
+            break
+
+        if i == "h":
+            print('Examples:')
+            for ex in examples:
+                print(f"- {ex}")
+            print()
+            continue
+
         q(i)
     except BaseException as e:
         print(f"Error occured: [{e.__class__.__name__}] {e}")
-        raise
 
 
 import pprint
