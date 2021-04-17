@@ -281,14 +281,13 @@ class Item:
             item = self
 
         table = Table(title=item.summary())
-        table.add_column("id")
-        table.add_column("tx")
         table.add_column("fact")
         table.add_column("value")
+        table.add_column("tx")
         table.add_column("created")
 
         for f in item.facts:
-            table.add_row(item.id, f.tx, f.get_key(), "" if f.value is None else str(f.value), f.created)
+            table.add_row(f.get_key(), "" if f.value is None else str(f.value), f.tx, f.created)
 
         print()
         print(table)
