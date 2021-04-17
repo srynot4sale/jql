@@ -266,6 +266,8 @@ class Item:
         content = None
         facts = []
         for f in self.facts:
+            if f.tag == "db" and f.fact is None:
+                continue
             if f.is_content():
                 content = f.as_string(markup=markup)
             else:
