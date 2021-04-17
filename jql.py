@@ -83,10 +83,9 @@ class Transaction:
             raise Exception(f"{new_id} should not already exist")
 
         i = Item(new_id)
+        i.add_fact(self, 'db', 'id', new_id, special=True)
         if content is not None:
             i.set_content(self, content)
-        else:
-            i.create_empty(self)
         DATA[new_id] = i
         return i
 
@@ -222,11 +221,6 @@ class Item:
     def set_content(self, tx, content):
         self.add_fact(tx, 'db', 'content', content)
 
-    def create_empty(self, tx):
-        if len(self.facts) != 0:
-            raise Exception("Item not empty")
-        self.add_tag(tx, 'db')
-
     def _save_fact(self, f):
         self.facts.append(f)
 
@@ -234,9 +228,8 @@ class Item:
         t = Fact(id=self.id, tag=tag, fact=None, value=None, tx=tx.id, created=tx.timestamp)
         self._save_fact(t)
 
-    def add_fact(self, tx, tag, fact=None, value=None):
-        # Bad fact
-        if 'tag' == 'db' and 'fact' == 'id':
+    def add_fact(self, tx, tag, fact=None, value=None, special=False):
+        if tag == 'db' and fact == 'id' and not special:
             raise Exception("Cannot change fact #db/id")
 
         # If we are adding a fact, check if already has the tag set or not
@@ -266,7 +259,7 @@ class Item:
         content = None
         facts = []
         for f in self.facts:
-            if f.tag == "db" and f.fact is None:
+            if f.tag == "db" and (f.fact is None or f.fact == "id"):
                 continue
             if f.is_content():
                 content = f.as_string(markup=markup)
