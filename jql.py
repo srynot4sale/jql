@@ -71,6 +71,9 @@ class Transaction:
         return self.closed == True
 
     def get_item(self, id):
+        if id not in DATA.keys():
+            raise Exception(f"Cannot find @{id}")
+
         item = DATA[id]
         return item
 
@@ -99,20 +102,17 @@ class Transaction:
                 raise Exception("No data supplied")
 
             content = None
-            for tag, fact, value in values:
-                if tag is None and fact is None:
+            for t, value in values:
+                if t == "id":
                     raise Exception("Not accepting ID's in a create")
-
-                if tag == "db" and fact == "id":
-                    raise Exception("Cannot hardcode db/id")
-
-                if tag == "db" and fact == "content":
+                if t == "content":
                     content = value
 
             item = self.create_item(content)
-            for tag, fact, value in values:
-                if tag == "db" and fact == "content":
+            for t, v in values:
+                if t == "content":
                     continue
+                tag, fact, value = v
                 item.add_fact(self, tag, fact, value)
 
             item.print_item()
@@ -123,18 +123,16 @@ class Transaction:
             if len(values) < 2:
                 raise Exception("No data supplied")
 
-            if values[0][0] is not None or values[0][1] is not None:
-                raise Exception(f"Expected an ID first - got {values[0]}")
+            if values[0][0] != 'id':
+                raise Exception(f"Expected an ID first - got {values[0][0]}")
 
-            _, _, id = values[0]
-            if id not in DATA.keys():
-                raise Exception(f"Cannot find @{id}")
-
+            _, id = values[0]
             item = self.get_item(id)
-            for tag, fact, value in values[1:]:
-                if tag == "db" and fact == "id":
-                    raise Exception("Cannot hardcode db/id")
-
+            for t, val in values[1:]:
+                if t == "content":
+                    tag, fact, value = "db", "content", val
+                else:
+                    tag, fact, value = val
                 item.add_fact(self, tag, fact, value)
 
             item.print_item()
@@ -145,13 +143,10 @@ class Transaction:
             if not values:
                 raise Exception("No data supplied")
 
-            if values[0][0] is not None and values[0][1] is not None:
-                raise Exception(f"Expected an ID first - got {values[0]}")
+            if values[0][0] != 'id':
+                raise Exception(f"Expected an ID first - got {values[0][0]}")
 
-            _, _, id = values[0]
-            if id not in DATA.keys():
-                raise Exception(f"Cannot find @{id}")
-
+            _, id = values[0]
             item = self.get_item(id)
             item.print_item(history=(action == 'history'))
             print()
@@ -161,18 +156,19 @@ class Transaction:
                 raise Exception("No data supplied")
 
             display = []
-            for val in values:
-                t, f, v = val
-                if t == "db" and f == "content":
-                    display.append(v)
-                if t is None:
+            for t, val in values:
+                if t == "content":
+                    display.append(val)
+                elif t == "id":
                     raise Exception("Can't list an ID")
-                elif f is None:
-                    display.append(f'#{t}')
-                elif v is None:
-                    display.append(f'#{t}/{f}')
                 else:
-                    display.append(f'#{t}/{f}={v}')
+                    tag, f, v = val
+                    if f is None:
+                        display.append(f'#{tag}')
+                    elif v is None:
+                        display.append(f'#{tag}/{f}')
+                    else:
+                        display.append(f'#{tag}/{f}={v}')
 
             table = Table(title=f"List all items matching the search terms: {' '.join(display)}")
             table.add_column("item")
@@ -180,16 +176,23 @@ class Transaction:
             # Check each data item as a current fact that matches every search term
             for id in DATA.keys():
                 notfound = False
-                item = self.get_item(id)
-                for val in values:
+                item = self.get_item(id).without_history()
+                for t, val in values:
                     if notfound:
                         break
-                    t, f, v = val
                     match = False
                     for fact in item.facts:
-                        if t == fact.tag and f == fact.fact and v == fact.value:
-                            match = True
-                            #print(f"Match {val=} == {fact=}")
+                        if t == "content":
+                            tag, f, v = "db", "content", val
+                        else:
+                            tag, f, v = val
+                        if tag == fact.tag and f == fact.fact:
+                            if t == "content":
+                                match = val in fact.value
+                            else:
+                                match = v == fact.value
+                            #if match:
+                            #    print(f"Match {val=} == {fact=}")
                             break
                         else:
                             #print(f"No match {val=} != {fact=}")
@@ -232,6 +235,10 @@ class Item:
         self._save_fact(t)
 
     def add_fact(self, tx, tag, fact=None, value=None):
+        # Bad fact
+        if 'tag' == 'db' and 'fact' == 'id':
+            raise Exception("Cannot change fact #db/id")
+
         # If we are adding a fact, check if already has the tag set or not
         if fact is not None and tag not in self.get_tags():
             self.add_tag(tx, tag)
@@ -317,15 +324,13 @@ class Fact:
         output = f'[green][bold]#[/bold]{self.tag}[/green]' if markup else f'#{self.tag}'
         if self.fact:
             output += f'/[orange1]{self.fact}[/orange1]' if markup else f'/{self.fact}'
-            if self.value is not True:
+            if self.value is not None:
                 output += f'=[yellow]{self.value}[/yellow]' if markup else f'={self.value}'
 
         return output
 
 
 def parse(query):
-    print(query)
-
     tokens = query.split(' ')
 
     action = tokens[0].lower()
@@ -351,11 +356,11 @@ def parse(query):
 
     for r in raw:
         if r.startswith('@'):
-            values.append((None, None, r.lstrip('@')))
+            values.append(('id', r.lstrip('@')))
             continue
 
         if not r.startswith('#'):
-            values.append(("db", "content", r))
+            values.append(('content', r))
             continue
 
         if "/" in r:
@@ -366,13 +371,13 @@ def parse(query):
 
         tag = tag.lstrip('#')
         if fact is None:
-            values.append((tag, None, None))
+            values.append(('fact', (tag, None, None)))
         else:
             if '=' in fact:
                 f, v = fact.split('=', 1)
-                values.append((tag, f, v))
+                values.append(('fact', (tag, f, v)))
             else:
-                values.append((tag, fact, None))
+                values.append(('fact', (tag, fact, None)))
 
     #print(f'action: {action}')
     #print(f'raw: {raw}')
@@ -396,6 +401,7 @@ examples = [
 aaron = User("aaron")
 client = aaron.get_client('jql')
 for ex in examples:
+    print(ex)
     tx = client.new_transaction()
     tx.q(ex)
     tx.commit()
