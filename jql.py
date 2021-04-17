@@ -1,5 +1,6 @@
 #!./venv/bin/python3
 
+import copy
 from dataclasses import dataclass
 import datetime
 
@@ -14,13 +15,281 @@ print = console.print
 DATA = {}
 TRANSACTIONS = {}
 
-@dataclass
+class User:
+    def __init__(self, name):
+        self.name = name
+
+    def get_client(self, client, tx="HEAD"):
+        return Client(self, name=client, tx=tx)
+
+
+class Client:
+    def __init__(self, user, name, tx):
+        self.user = user
+        self.name = name
+        self.tx = tx
+
+    def new_transaction(self):
+        tx = Transaction(user=self.user, client=self)
+        return tx
+
+
 class Transaction:
-    id: str
-    timestamp: str
-    request: str
-    user: str
-    client: str
+    def __init__(self, user, client):
+        self._id = None
+        self.timestamp = None
+        self.query = None
+        self.user = user
+        self.client = client
+        self.closed = False
+
+    @property
+    def id(self):
+        if not self._id:
+            if not self.query:
+                raise Exception("No query in transaction")
+
+            new_id = str(len(TRANSACTIONS.keys()))
+
+            if TRANSACTIONS.get(new_id):
+                raise Exception(f"{new_id} transaction should not already exist")
+
+            self._id = new_id
+            self.timestamp = str(datetime.datetime.now().timestamp())[:-3]
+            TRANSACTIONS[new_id] = self
+
+        return self._id
+
+    @id.setter
+    def id(self, v):
+        raise Exception("Cannot set transaction id manually")
+
+    def commit(self):
+        self.closed = True
+
+    def is_closed(self):
+        return self.closed == True
+
+    def get_item(self, id):
+        item = DATA[id]
+        return item
+
+    def create_item(self, content=None):
+        new_id = str(len(DATA.keys()))
+        if DATA.get(new_id):
+            raise Exception(f"{new_id} should not already exist")
+
+        i = Item(new_id)
+        if content is not None:
+            i.set_content(self, content)
+        else:
+            i.create_empty(self)
+        DATA[new_id] = i
+        return i
+
+    def q(self, query):
+        if self.is_closed():
+            raise Exception("Transaction already completed")
+
+        self.query = query
+        _, action, raw, values = parse(query)
+
+        if action == 'create':
+            if not values:
+                raise Exception("No data supplied")
+
+            content = None
+            for tag, fact, value in values:
+                if tag is None and fact is None:
+                    raise Exception("Not accepting ID's in a create")
+
+                if tag == "db" and fact == "id":
+                    raise Exception("Cannot hardcode db/id")
+
+                if tag == "db" and fact == "content":
+                    content = value
+
+            item = self.create_item(content)
+            for tag, fact, value in values:
+                if tag == "db" and fact == "content":
+                    continue
+                item.add_fact(self, tag, fact, value)
+
+            item.print_item()
+            print(f"Created @{item.id}")
+            print()
+
+        if action == 'set':
+            if len(values) < 2:
+                raise Exception("No data supplied")
+
+            if values[0][0] is not None or values[0][1] is not None:
+                raise Exception(f"Expected an ID first - got {values[0]}")
+
+            _, _, id = values[0]
+            if id not in DATA.keys():
+                raise Exception(f"Cannot find @{id}")
+
+            item = self.get_item(id)
+            for tag, fact, value in values[1:]:
+                if tag == "db" and fact == "id":
+                    raise Exception("Cannot hardcode db/id")
+
+                item.add_fact(self, tag, fact, value)
+
+            item.print_item()
+            print(f"Updated @{id}")
+            print()
+
+        if action in ('get', 'history'):
+            if not values:
+                raise Exception("No data supplied")
+
+            if values[0][0] is not None and values[0][1] is not None:
+                raise Exception(f"Expected an ID first - got {values[0]}")
+
+            _, _, id = values[0]
+            if id not in DATA.keys():
+                raise Exception(f"Cannot find @{id}")
+
+            item = self.get_item(id)
+            item.print_item(history=(action == 'history'))
+            print()
+
+        if action == 'list':
+            if not values:
+                raise Exception("No data supplied")
+
+            display = []
+            for val in values:
+                t, f, v = val
+                if t == "db" and f == "content":
+                    display.append(v)
+                if t is None:
+                    raise Exception("Can't list an ID")
+                elif f is None:
+                    display.append(f'#{t}')
+                elif v is None:
+                    display.append(f'#{t}/{f}')
+                else:
+                    display.append(f'#{t}/{f}={v}')
+
+            table = Table(title=f"List all items matching the search terms: {' '.join(display)}")
+            table.add_column("item")
+
+            # Check each data item as a current fact that matches every search term
+            for id in DATA.keys():
+                notfound = False
+                item = self.get_item(id)
+                for val in values:
+                    if notfound:
+                        break
+                    t, f, v = val
+                    match = False
+                    for fact in item.facts:
+                        if t == fact.tag and f == fact.fact and v == fact.value:
+                            match = True
+                            #print(f"Match {val=} == {fact=}")
+                            break
+                        else:
+                            #print(f"No match {val=} != {fact=}")
+                            pass
+                    if not match:
+                        notfound = True
+
+                if not notfound:
+                    table.add_row(item.summary())
+
+            print()
+            print(table)
+            print()
+
+        self.commit()
+
+
+class Item:
+    def __init__(self, id):
+        self.id = id
+        self.facts = []
+
+    def __repr__(self):
+        f = ',\n\t\t'.join([str(f) for f in self.facts])
+        return f"Item(\n\tid={self.id},\n\tfacts=[\n\t\t{f}\n\t])"
+
+    def set_content(self, tx, content):
+        self.add_fact(tx, 'db', 'content', content)
+
+    def create_empty(self, tx):
+        if len(self.facts) != 0:
+            raise Exception("Item not empty")
+        self.add_tag(tx, 'db')
+
+    def _save_fact(self, f):
+        self.facts.append(f)
+
+    def add_tag(self, tx, tag):
+        t = Fact(id=self.id, tag=tag, fact=None, value=None, tx=tx.id, created=tx.timestamp)
+        self._save_fact(t)
+
+    def add_fact(self, tx, tag, fact=None, value=None):
+        # If we are adding a fact, check if already has the tag set or not
+        if fact is not None and tag not in self.get_tags():
+            self.add_tag(tx, tag)
+
+        f = Fact(id=self.id, tag=tag, fact=fact, value=value, tx=tx.id, created=tx.timestamp)
+        self._save_fact(f)
+
+    def get_tags(self):
+        return set(f.tag for f in self.facts if f.is_tag())
+
+    def without_history(self):
+        sorted_facts = {}
+        for f in self.facts:
+            if f.get_key() in sorted_facts.keys():
+                # If existing tx is newer, don't update
+                if sorted_facts[f.get_key()].tx > f.tx:
+                    continue
+            sorted_facts[f.get_key()] = f
+
+        item = copy.deepcopy(self)
+        item.facts = list(sorted_facts.values())
+        return item
+
+    def summary(self, markup=True):
+        content = None
+        facts = []
+        for f in self.facts:
+            if f.is_content():
+                content = f.as_string(markup=markup)
+            else:
+                facts.append(f.as_string(markup=markup))
+
+        if content is not None:
+            facts.insert(0, content)
+
+        if markup:
+            return f"[deep_sky_blue1][bold]@[/bold]{self.id}[/deep_sky_blue1] {' '.join(facts)}"
+        else:
+            return f"@{self.id} {' '.join(facts)}"
+
+    def print_item(self, history=False):
+        if not history:
+            item = self.without_history()
+        else:
+            item = self
+
+        table = Table(title=item.summary())
+        table.add_column("id")
+        table.add_column("tx")
+        table.add_column("fact")
+        table.add_column("value")
+        table.add_column("created")
+
+        for f in item.facts:
+            table.add_row(item.id, f.tx, f.get_key(), "" if f.value is None else str(f.value), f.created)
+
+        print()
+        print(table)
 
 
 @dataclass
@@ -32,120 +301,29 @@ class Fact:
     tx: str
     created: str
 
+    def is_tag(self):
+        return self.fact is None
+
     def get_key(self):
         return f"{self.tag}{'/'+self.fact if self.fact is not None else ''}"
 
     def is_content(self):
         return self.tag == "db" and self.fact == "content"
 
-    def as_string(self):
+    def as_string(self, markup=True):
         if self.is_content():
             return self.value
+
+        output = f'[green][bold]#[/bold]{self.tag}[/green]' if markup else f'#{self.tag}'
         if self.fact:
-            if self.value is True:
-                return f'#{self.tag}/{self.fact}'
-            else:
-                return f'#{self.tag}/{self.fact}={self.value}'
-        else:
-            return f'#{self.tag}'
+            output += f'/[orange1]{self.fact}[/orange1]' if markup else f'/{self.fact}'
+            if self.value is not True:
+                output += f'=[yellow]{self.value}[/yellow]' if markup else f'={self.value}'
 
-    def as_markedup_string(self):
-        if self.is_content():
-            return self.as_string()
-        if self.fact:
-            if self.value is True:
-                return f'[green][bold]#[/bold]{self.tag}[/green]/[orange1]{self.fact}[/orange1]'
-            else:
-                return f'[green][bold]#[/bold]{self.tag}[/green]/[orange1]{self.fact}[/orange1]=[yellow]{self.value}[/yellow]'
-        else:
-            return f'[green][bold]#[/bold]{self.tag}[/green]'
-
-def new_transaction(query):
-    new_id = str(len(TRANSACTIONS.keys()))
-    if TRANSACTIONS.get(new_id):
-        raise Exception(f"{new_id} transaction should not already exist")
-
-    tx = Transaction(id=new_id, timestamp=str(datetime.datetime.now().timestamp())[:-3], request=query, user="aaron", client="jql")
-    TRANSACTIONS[new_id] = tx
-    return tx
+        return output
 
 
-def new_item(tx):
-    new_id = str(len(DATA.keys()))
-    if DATA.get(new_id):
-        raise Exception(f"{new_id} should not already exist")
-
-    DATA[new_id] = []
-    new_fact(new_id, 'db', None, None, tx)
-    return new_id
-
-
-def get_tags(facts):
-    return set(f.tag for f in facts if f.fact is None)
-
-
-def new_fact(id, tag, fact, value, tx):
-    # If we are adding a fact, check if already has the tag set or not
-    if fact is not None and tag not in get_tags(get_item(id)):
-        t = Fact(id=id, tag=tag, fact=None, value=None, tx=tx.id, created=tx.timestamp)
-        DATA[id].append(t)
-
-    f = Fact(id=id, tag=tag, fact=fact, value=value, tx=tx.id, created=tx.timestamp)
-    DATA[id].append(f)
-
-
-def summary_item(id):
-    content = None
-    facts = []
-    for f in get_item(id):
-        if f.is_content():
-            content = f.as_string()
-        else:
-            facts.append(f.as_markedup_string())
-
-    if content is not None:
-        facts.insert(0, content)
-
-    return f"[deep_sky_blue1][bold]@[/bold]{id}[/deep_sky_blue1] {' '.join(facts)}"
-
-
-def get_item(id, history=False):
-    all_facts = DATA[id]
-
-    if history:
-        facts = all_facts
-    else:
-        sorted_facts = {}
-        for f in all_facts:
-            if f.get_key() in sorted_facts.keys():
-                # If existing tx is newer, don't update
-                if sorted_facts[f.get_key()].tx > f.tx:
-                    continue
-            sorted_facts[f.get_key()] = f
-        facts = sorted_facts.values()
-
-    return facts
-
-
-def print_item(id, history=False):
-    facts = get_item(id, history)
-    tags = get_tags(facts)
-
-    table = Table(title=summary_item(id))
-    table.add_column("id")
-    table.add_column("tx")
-    table.add_column("fact")
-    table.add_column("value")
-    table.add_column("created")
-
-    for f in facts:
-        table.add_row(id, f.tx, f.get_key(), "" if f.value is None else str(f.value), f.created)
-
-    print()
-    print(table)
-
-
-def q(query):
+def parse(query):
     print(query)
 
     tokens = query.split(' ')
@@ -194,131 +372,12 @@ def q(query):
                 f, v = fact.split('=', 1)
                 values.append((tag, f, v))
             else:
-                values.append((tag, fact, True))
-
+                values.append((tag, fact, None))
 
     #print(f'action: {action}')
     #print(f'raw: {raw}')
     #print(f'values: {values}')
-
-    if action == 'create':
-        tx = new_transaction(query)
-        id = new_item(tx)
-
-        if not values:
-            raise Exception("No data supplied")
-
-        for tag, fact, value in values:
-            if tag is None and fact is None:
-                raise Exception("Not accepting ID's in a create")
-
-            if tag == "db" and fact in ("id", "tx"):
-                raise Exception("Cannot hardcode db/tx or db/id")
-
-            new_fact(id, tag, fact, value, tx)
-
-        print_item(id)
-        print(f"Created @{id}")
-        print()
-
-    if action == 'set':
-        tx = new_transaction(query)
-
-        if len(values) < 2:
-            raise Exception("No data supplied")
-
-        if values[0][0] is not None and values[0][1] is not None:
-            raise Exception(f"Expected an ID first - got {values[0]}")
-
-        _, _, id = values[0]
-        if id not in DATA.keys():
-            raise Exception(f"Cannot find @{id}")
-
-        for tag, fact, value in values[1:]:
-            if tag == "db" and fact in ("id", "tx"):
-                raise Exception("Cannot hardcode db/tx or db/id")
-
-            new_fact(id, tag, fact, value, tx)
-
-        print_item(id)
-        print(f"Updated @{id}")
-        print()
-
-    if action == 'history':
-        if not values:
-            raise Exception("No data supplied")
-
-        if values[0][0] is not None and values[0][1] is not None:
-            raise Exception(f"Expected an ID first - got {values[0]}")
-
-        _, _, id = values[0]
-        if id not in DATA.keys():
-            raise Exception(f"Cannot find @{id}")
-
-        print_item(id, history=True)
-        print()
-
-    if action == 'get':
-        if not values:
-            raise Exception("No data supplied")
-
-        if values[0][0] is not None and values[0][1] is not None:
-            raise Exception(f"Expected an ID first - got {values[0]}")
-
-        _, _, id = values[0]
-        if id not in DATA.keys():
-            raise Exception(f"Cannot find @{id}")
-
-        print_item(id)
-        print()
-
-    if action == 'list':
-        if not values:
-            raise Exception("No data supplied")
-
-        display = []
-        for val in values:
-            t, f, v = val
-            if t == "db" and f == "content":
-                display.append(v)
-            if t is None:
-                raise Exception("Can't list an ID")
-            elif f is None:
-                display.append(f'#{t}')
-            elif v is None:
-                display.append(f'#{t}/{f}')
-            else:
-                display.append(f'#{t}/{f}={v}')
-
-        table = Table(title=f"List all items matching the search terms: {' '.join(display)}")
-        table.add_column("item")
-
-        # Check each data item as a current fact that matches every search term
-        for id in DATA.keys():
-            notfound = False
-            facts = get_item(id)
-            for val in values:
-                if notfound:
-                    break
-                t, f, v = val
-                match = False
-                for fact in facts:
-                    if t == fact.tag and f == fact.fact and v == fact.value:
-                        match = True
-                        #print(f"Match {val=} == {fact=}")
-                        break
-                    else:
-                        #print(f"No match {val=} != {fact=}")
-                        pass
-                if not match:
-                    notfound = True
-
-            if not notfound:
-                table.add_row(summary_item(id))
-
-        print()
-        print(table)
-        print()
+    return (query, action, raw, values)
 
 
 
@@ -334,13 +393,18 @@ examples = [
     "LIST do dishes",
 ]
 
+aaron = User("aaron")
+client = aaron.get_client('jql')
 for ex in examples:
-    q(ex)
-
-
+    tx = client.new_transaction()
+    tx.q(ex)
+    tx.commit()
 
 print('Welcome to JQL')
 print('q to quit, h for help')
+
+print(f"Logged in as {aaron.name}, with client {client.name} at {client.tx}")
+
 while True:
     try:
         i = Prompt.ask('')
@@ -355,7 +419,9 @@ while True:
             print()
             continue
 
-        q(i)
+        tx = client.new_transaction()
+        tx.q(i)
+        tx.commit()
     except BaseException as e:
         print(f"Error occured: [{e.__class__.__name__}] {e}")
 
