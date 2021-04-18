@@ -175,12 +175,12 @@ class Transaction:
             # Check each data item as a current fact that matches every search term
             for id in DATA.keys():
                 notfound = False
-                item = self.get_item(id).without_history()
+                item = self.get_item(id)
                 for t, val in values:
                     if notfound:
                         break
                     match = False
-                    for fact in item.facts:
+                    for fact in item.get_facts():
                         if t == "content":
                             tag, f, v = "db", "content", val
                         else:
@@ -212,17 +212,22 @@ class Transaction:
 class Item:
     def __init__(self, id):
         self.id = id
-        self.facts = []
+        self._facts = []
+        self._current = []
 
     def __repr__(self):
-        f = ',\n\t\t'.join([str(f) for f in self.facts])
+        f = ',\n\t\t'.join([str(f) for f in self.get_facts(history=True)])
         return f"Item(\n\tid={self.id},\n\tfacts=[\n\t\t{f}\n\t])"
 
     def set_content(self, tx, content):
         self.add_fact(tx, 'db', 'content', content)
 
+    def get_facts(self, history=False):
+        return self._facts if history else self._current
+
     def _save_fact(self, f):
-        self.facts.append(f)
+        self._facts.append(f)
+        self._current.append(f)
 
     def add_tag(self, tx, tag):
         t = Fact(id=self.id, tag=tag, fact=None, value=None, tx=tx.id, created=tx.timestamp)
@@ -240,25 +245,12 @@ class Item:
         self._save_fact(f)
 
     def get_tags(self):
-        return set(f.tag for f in self.facts if f.is_tag())
-
-    def without_history(self):
-        sorted_facts = {}
-        for f in self.facts:
-            if f.get_key() in sorted_facts.keys():
-                # If existing tx is newer, don't update
-                if sorted_facts[f.get_key()].tx > f.tx:
-                    continue
-            sorted_facts[f.get_key()] = f
-
-        item = copy.deepcopy(self)
-        item.facts = list(sorted_facts.values())
-        return item
+        return set(f.tag for f in self.get_facts() if f.is_tag())
 
     def summary(self, markup=True):
         content = None
         facts = []
-        for f in self.facts:
+        for f in self.get_facts():
             if f.tag == "db" and (f.fact is None or f.fact == "id"):
                 continue
             if f.is_content():
@@ -275,18 +267,13 @@ class Item:
             return f"@{self.id} {' '.join(facts)}"
 
     def print_item(self, history=False):
-        if not history:
-            item = self.without_history()
-        else:
-            item = self
-
-        table = Table(title=item.summary())
+        table = Table(title=self.summary())
         table.add_column("fact")
         table.add_column("value")
         table.add_column("tx")
         table.add_column("created")
 
-        for f in item.facts:
+        for f in self.get_facts(history=history):
             table.add_row(f.get_key(), "" if f.value is None else str(f.value), f.tx, f.created)
 
         print()
@@ -306,7 +293,7 @@ class Fact:
         return self.fact is None
 
     def get_key(self):
-        return f"{self.tag}{'/'+self.fact if self.fact is not None else ''}"
+        return self.tag if self.fact is None else f'#{self.tag}/{self.fact}'
 
     def is_content(self):
         return self.tag == "db" and self.fact == "content"
