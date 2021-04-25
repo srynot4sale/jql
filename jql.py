@@ -4,7 +4,7 @@ import copy
 from dataclasses import dataclass
 import datetime
 
-
+from neo4j import GraphDatabase
 from rich.console import Console
 from rich.prompt import Prompt
 from rich.table import Table
@@ -12,26 +12,28 @@ from rich.table import Table
 console = Console()
 print = console.print
 
-DATA = {}
 TRANSACTIONS = {}
+
 
 class User:
     def __init__(self, name):
         self.name = name
+        self.driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "test"))
 
     def get_client(self, client, tx="HEAD"):
-        return Client(self, name=client, tx=tx)
+        session = self.driver.session()
+        return Client(self, session=session, name=client, tx=tx)
 
 
 class Client:
-    def __init__(self, user, name, tx):
+    def __init__(self, user, session, name, tx):
         self.user = user
+        self.session = session
         self.name = name
         self.tx = tx
 
     def new_transaction(self):
-        tx = Transaction(user=self.user, client=self)
-        return tx
+        return Transaction(user=self.user, client=self)
 
 
 class Transaction:
@@ -41,7 +43,10 @@ class Transaction:
         self.query = None
         self.user = user
         self.client = client
-        self.closed = False
+        self.transaction = self.client.session.begin_transaction()
+
+    def __repr__(self):
+        return self.query
 
     @property
     def id(self):
@@ -65,29 +70,39 @@ class Transaction:
         raise Exception("Cannot set transaction id manually")
 
     def commit(self):
-        self.closed = True
+        self.transaction.commit()
 
     def is_closed(self):
-        return self.closed == True
+        return self.transaction.closed()
+
+    def run(self, query, data):
+        return self.transaction.run(query, data)
+
+    def get_one(self, query, data):
+        q = self.run(query, data)
+        return q.single()
 
     def get_item(self, id):
-        if id not in DATA.keys():
-            raise Exception(f"Cannot find @{id}")
-
-        item = DATA[id]
+        item = Item(self, id, exists=True)
         return item
 
     def create_item(self, content=None):
-        new_id = str(len(DATA.keys()))
-        if DATA.get(new_id):
-            raise Exception(f"{new_id} should not already exist")
+        q = self.get_one("CREATE (a:db) RETURN id(a) AS node_id", {})
+        new_id = str(q['node_id'])
 
-        i = Item(new_id)
+        i = Item(self, new_id)
         i.add_fact(self, 'db', 'id', new_id, special=True)
         if content is not None:
             i.set_content(self, content)
-        DATA[new_id] = i
         return i
+
+    def get_all(self):
+        result = self.run(f"MATCH (a:db) RETURN id(a) AS node_id", {})
+        items = []
+        for r in result:
+            items.append(self.get_item(r['node_id']))
+
+        return items
 
     def q(self, query):
         if self.is_closed():
@@ -173,9 +188,8 @@ class Transaction:
             table.add_column("item")
 
             # Check each data item as a current fact that matches every search term
-            for id in DATA.keys():
+            for item in self.get_all():
                 notfound = False
-                item = self.get_item(id)
                 for t, val in values:
                     if notfound:
                         break
@@ -206,14 +220,17 @@ class Transaction:
             print(table)
             print()
 
-        self.commit()
-
 
 class Item:
-    def __init__(self, id):
+    def __init__(self, tx, id, exists=False):
+        self.tx = tx
         self.id = id
         self._facts = []
         self._current = []
+        if exists:
+            result = self.tx.get_one(f"MATCH (a:db) WHERE id(a) = $id RETURN a", {"id": int(self.id)})
+            if not result:
+                raise Exception(f'@{self.id} does not exist')
 
     def __repr__(self):
         f = ',\n\t\t'.join([str(f) for f in self.get_facts(history=True)])
@@ -223,11 +240,27 @@ class Item:
         self.add_fact(tx, 'db', 'content', content)
 
     def get_facts(self, history=False):
-        return self._facts if history else self._current
+        self._facts = []
+        result = self.tx.get_one(f"MATCH (a:db) WHERE id(a) = $id RETURN a", {"id": int(self.id)})
+        #print(result)
+        #print(result[0].labels)
+        for tag in result[0].labels:
+            self._facts.append(Fact(id=self.id, tag=tag, fact=None, value=None, tx="", created=""))
+
+        for prop, val in result[0].items():
+            tag, fact = prop.split('_', 1)
+            self._facts.append(Fact(id=self.id, tag=tag, fact=fact, value=val if val != True else None, tx="", created=""))
+
+        return self._facts#if history else self._current
 
     def _save_fact(self, f):
-        self._facts.append(f)
-        self._current.append(f)
+
+        if f.fact is None:
+            result = self.tx.run(f"MATCH (a:db) WHERE id(a) = $id SET a{f.db_key}", {"id": int(self.id)})
+        elif f.value is None:
+            result = self.tx.run(f"MATCH (a:db) WHERE id(a) = $id SET a{f.db_key} = true", {"id": int(self.id)})
+        else:
+            result = self.tx.run(f"MATCH (a:db) WHERE id(a) = $id SET a{f.db_key} = $val", {"id": int(self.id), "val": f.value})
 
     def add_tag(self, tx, tag):
         t = Fact(id=self.id, tag=tag, fact=None, value=None, tx=tx.id, created=tx.timestamp)
@@ -294,6 +327,10 @@ class Fact:
 
     def get_key(self):
         return self.tag if self.fact is None else f'#{self.tag}/{self.fact}'
+
+    @property
+    def db_key(self):
+        return f':{self.tag}' if self.fact is None else f'.{self.tag}_{self.fact}'
 
     def is_content(self):
         return self.tag == "db" and self.fact == "content"
@@ -371,10 +408,10 @@ examples = [
     "CREATE go to supermarket #todo #todo/completed",
     "CREATE do dishes #todo #chores",
     "CREATE book appointment #todo #todo/remind_at=20210412",
-    "SET @1 #todo/completed",
-    "SET @2 book appointment at physio",
-    "GET @2",
-    "HISTORY @2",
+    "SET @40 #todo/completed",
+    "SET @41 book appointment at physio",
+    "GET @41",
+    "HISTORY @41",
     "LIST #todo/completed",
     "LIST do dishes",
 ]
@@ -416,6 +453,4 @@ while True:
 import pprint
 print('TRANSACTIONS')
 pprint.pprint(TRANSACTIONS)
-print('DATA')
-pprint.pprint(DATA)
 
