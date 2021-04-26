@@ -96,12 +96,20 @@ class Transaction:
             i.set_content(self, content)
         return i
 
-    def get_all(self):
-        result = self.run(f"MATCH (a:db) RETURN id(a) AS node_id", {})
+    def get_many(self, tags=[], facts=[]):
+        tags.append("db")
+        qlabels = ":".join(tags)
+        where = []
+        for f in facts:
+            if f.has_value():
+                where.append(f"a{f.db_key} = \"{f.value}\"")
+            else:
+                where.append(f"a{f.db_key} <> \"\"")
+        qwhere = f"WHERE {' AND '.join(where)}" if len(where) else ""
+        result = self.run(f"MATCH (a:{qlabels}) {qwhere} RETURN id(a) AS node_id", {})
         items = []
         for r in result:
             items.append(self.get_item(r['node_id']))
-
         return items
 
     def q(self, query):
@@ -170,6 +178,8 @@ class Transaction:
                 raise Exception("No data supplied")
 
             display = []
+            tags = []
+            facts = []
             for t, val in values:
                 if t == "content":
                     display.append(val)
@@ -179,42 +189,20 @@ class Transaction:
                     tag, f, v = val
                     if f is None:
                         display.append(f'#{tag}')
+                        tags.append(tag)
                     elif v is None:
                         display.append(f'#{tag}/{f}')
+                        facts.append(F(tag=tag, fact=f, value=None))
                     else:
                         display.append(f'#{tag}/{f}={v}')
+                        facts.append(F(tag=tag, fact=f, value=v))
 
             table = Table(title=f"List all items matching the search terms: {' '.join(display)}")
             table.add_column("item")
 
             # Check each data item as a current fact that matches every search term
-            for item in self.get_all():
-                notfound = False
-                for t, val in values:
-                    if notfound:
-                        break
-                    match = False
-                    for fact in item.get_facts():
-                        if t == "content":
-                            tag, f, v = "db", "content", val
-                        else:
-                            tag, f, v = val
-                        if tag == fact.tag and f == fact.fact:
-                            if t == "content":
-                                match = val in fact.value
-                            else:
-                                match = v == fact.value
-                            #if match:
-                            #    print(f"Match {val=} == {fact=}")
-                            break
-                        else:
-                            #print(f"No match {val=} != {fact=}")
-                            pass
-                    if not match:
-                        notfound = True
-
-                if not notfound:
-                    table.add_row(item.summary())
+            for item in self.get_many(tags=tags, facts=facts):
+                table.add_row(item.summary())
 
             print()
             print(table)
@@ -314,19 +302,22 @@ class Item:
 
 
 @dataclass
-class Fact:
-    id: str
+class F:
     tag: str
     fact: str
     value: str
-    tx: str
-    created: str
 
     def is_tag(self):
         return self.fact is None
 
+    def is_fact(self):
+        return not self.is_tag()
+
     def get_key(self):
         return self.tag if self.fact is None else f'#{self.tag}/{self.fact}'
+
+    def has_value(self):
+        return self.value is not None
 
     @property
     def db_key(self):
@@ -340,12 +331,22 @@ class Fact:
             return self.value
 
         output = f'[green][bold]#[/bold]{self.tag}[/green]' if markup else f'#{self.tag}'
-        if self.fact:
+        if self.is_fact():
             output += f'/[orange1]{self.fact}[/orange1]' if markup else f'/{self.fact}'
-            if self.value is not None:
+            if self.has_value():
                 output += f'=[yellow]{self.value}[/yellow]' if markup else f'={self.value}'
 
         return output
+
+
+@dataclass
+class Fact(F):
+    id: str
+    tag: str
+    fact: str
+    value: str
+    tx: str
+    created: str
 
 
 def parse(query):
