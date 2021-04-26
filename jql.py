@@ -86,6 +86,11 @@ class Transaction:
         item = Item(self, id, exists=True)
         return item
 
+    def _produce_item(self, id, facts):
+        item = Item(self, id)
+        item._set_facts(facts)
+        return item
+
     def create_item(self, content=None):
         q = self.get_one("CREATE (a:db) RETURN id(a) AS node_id", {})
         new_id = str(q['node_id'])
@@ -106,10 +111,10 @@ class Transaction:
             else:
                 where.append(f"a{f.db_key} <> \"\"")
         qwhere = f"WHERE {' AND '.join(where)}" if len(where) else ""
-        result = self.run(f"MATCH (a:{qlabels}) {qwhere} RETURN id(a) AS node_id", {})
+        result = self.run(f"MATCH (a:{qlabels}) {qwhere} RETURN a", {})
         items = []
-        for r in result:
-            items.append(self.get_item(r['node_id']))
+        for r, in result:
+            items.append(self._produce_item(r.id, r))
         return items
 
     def q(self, query):
@@ -219,6 +224,8 @@ class Item:
             result = self.tx.get_one(f"MATCH (a:db) WHERE id(a) = $id RETURN a", {"id": int(self.id)})
             if not result:
                 raise Exception(f'@{self.id} does not exist')
+            else:
+                self._set_facts(result[0])
 
     def __repr__(self):
         f = ',\n\t\t'.join([str(f) for f in self.get_facts(history=True)])
@@ -232,14 +239,16 @@ class Item:
         result = self.tx.get_one(f"MATCH (a:db) WHERE id(a) = $id RETURN a", {"id": int(self.id)})
         #print(result)
         #print(result[0].labels)
-        for tag in result[0].labels:
+        self._set_facts(result[0])
+        return self._facts#if history else self._current
+
+    def _set_facts(self, facts):
+        for tag in facts.labels:
             self._facts.append(Fact(id=self.id, tag=tag, fact=None, value=None, tx="", created=""))
 
-        for prop, val in result[0].items():
+        for prop, val in facts.items():
             tag, fact = prop.split('_', 1)
             self._facts.append(Fact(id=self.id, tag=tag, fact=fact, value=val if val != True else None, tx="", created=""))
-
-        return self._facts#if history else self._current
 
     def _save_fact(self, f):
 
