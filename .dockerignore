@@ -1,0 +1,8 @@
+.git/
+/venv/
+Dockerfile.test
+docker-compose.test.yml
+Makefile
+/data/
+/logs/
+__pycache__/
