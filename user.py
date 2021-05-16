@@ -12,4 +12,3 @@ class User:
     def get_client(self, client, tx="HEAD"):
         session = self.driver.session()
         return Client(self, session=session, name=client, tx=tx)
-

@@ -10,4 +10,3 @@ class Client:
 
     def new_transaction(self):
         return Transaction(user=self.user, client=self)
-

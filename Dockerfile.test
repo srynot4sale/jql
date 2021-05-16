@@ -1,4 +1,4 @@
-FROM python:3.7-slim
+FROM python:3.8-slim
 
 MAINTAINER Aaron Barnes <aaron@io.nz>
 
@@ -11,15 +11,20 @@ RUN apt-get update && \
 
 ENV PYTHONPATH="/code/:${PYTHONPATH}"
 
-CMD ["python3", "test.py"]
-
-ADD requirements.txt /tmp/
+CMD ["pytest", "-p", "no:cacheprovider"]
 
 RUN mkdir /code
 WORKDIR /code
 
-RUN pip install -r /tmp/requirements.txt
+ADD requirements.txt /tmp/
+ADD requirements-test.txt /tmp/
 
+RUN pip install --upgrade pip
+RUN pip install -r /tmp/requirements-test.txt
+
+COPY .flake8 /code/
 COPY *.py /code/
 
 USER jql
+
+RUN flake8

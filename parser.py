@@ -47,7 +47,7 @@ def parse(query):
             else:
                 values.append(('fact', (tag, fact, None)))
 
-    #print(f'action: {action}')
-    #print(f'raw: {raw}')
-    #print(f'values: {values}')
+    # print(f'action: {action}')
+    # print(f'raw: {raw}')
+    # print(f'values: {values}')
     return (query, action, raw, values)

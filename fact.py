@@ -47,4 +47,3 @@ class Fact(F):
     value: str
     tx: str
     created: str
-

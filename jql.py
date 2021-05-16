@@ -27,10 +27,7 @@ while True:
             break
 
         if i == "h":
-            print('Examples:')
-            for ex in examples:
-                print(f"- {ex}")
-            print()
+            print('HELP!')
             continue
 
         tx = client.new_transaction()
@@ -38,4 +35,3 @@ while True:
         tx.commit()
     except BaseException as e:
         print(f"Error occured: [{e.__class__.__name__}] {e}")
-

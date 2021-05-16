@@ -12,6 +12,7 @@ print = console.print
 
 TRANSACTIONS = {}
 
+
 class Transaction:
     def __init__(self, user, client):
         self._id = None
@@ -77,7 +78,9 @@ class Transaction:
             i.set_content(self, content)
         return i
 
-    def get_many(self, tags=[], facts=[]):
+    def get_many(self, tags=None, facts=None):
+        tags = tags or []
+        facts = facts or []
         tags.append("db")
         qlabels = ":".join(tags)
         where = []
@@ -188,4 +191,3 @@ class Transaction:
             print()
             print(table)
             print()
-

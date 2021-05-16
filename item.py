@@ -7,6 +7,7 @@ from fact import Fact
 console = Console()
 print = console.print
 
+
 class Item:
     def __init__(self, tx, id, exists=False):
         self.tx = tx
@@ -14,7 +15,7 @@ class Item:
         self._facts = []
         self._current = []
         if exists:
-            result = self.tx.get_one(f"MATCH (a:db) WHERE id(a) = $id RETURN a", {"id": int(self.id)})
+            result = self.tx.get_one("MATCH (a:db) WHERE id(a) = $id RETURN a", {"id": int(self.id)})
             if not result:
                 raise Exception(f'@{self.id} does not exist')
             else:
@@ -29,11 +30,11 @@ class Item:
 
     def get_facts(self, history=False):
         self._facts = []
-        result = self.tx.get_one(f"MATCH (a:db) WHERE id(a) = $id RETURN a", {"id": int(self.id)})
-        #print(result)
-        #print(result[0].labels)
+        result = self.tx.get_one("MATCH (a:db) WHERE id(a) = $id RETURN a", {"id": int(self.id)})
+        # print(result)
+        # print(result[0].labels)
         self._set_facts(result[0])
-        return self._facts#if history else self._current
+        return self._facts  # if history else self._current
 
     def _set_facts(self, facts):
         for tag in facts.labels:
@@ -41,16 +42,16 @@ class Item:
 
         for prop, val in facts.items():
             tag, fact = prop.split('_', 1)
-            self._facts.append(Fact(id=self.id, tag=tag, fact=fact, value=val if val != True else None, tx="", created=""))
+            self._facts.append(Fact(id=self.id, tag=tag, fact=fact, value=val if val is not True else None, tx="", created=""))
 
     def _save_fact(self, f):
 
         if f.fact is None:
-            result = self.tx.run(f"MATCH (a:db) WHERE id(a) = $id SET a{f.db_key}", {"id": int(self.id)})
+            self.tx.run(f"MATCH (a:db) WHERE id(a) = $id SET a{f.db_key}", {"id": int(self.id)})
         elif f.value is None:
-            result = self.tx.run(f"MATCH (a:db) WHERE id(a) = $id SET a{f.db_key} = true", {"id": int(self.id)})
+            self.tx.run(f"MATCH (a:db) WHERE id(a) = $id SET a{f.db_key} = true", {"id": int(self.id)})
         else:
-            result = self.tx.run(f"MATCH (a:db) WHERE id(a) = $id SET a{f.db_key} = $val", {"id": int(self.id), "val": f.value})
+            self.tx.run(f"MATCH (a:db) WHERE id(a) = $id SET a{f.db_key} = $val", {"id": int(self.id), "val": f.value})
 
     def add_tag(self, tx, tag):
         t = Fact(id=self.id, tag=tag, fact=None, value=None, tx=tx.id, created=tx.timestamp)
@@ -101,4 +102,3 @@ class Item:
 
         print()
         print(table)
-

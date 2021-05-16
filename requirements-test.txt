@@ -1,0 +1,6 @@
+-r requirements.txt
+pytest
+flake8
+flake8-bugbear
+flake8-bandit
+flake8-mutable
