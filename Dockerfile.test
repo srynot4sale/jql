@@ -11,7 +11,7 @@ RUN apt-get update && \
 
 ENV PYTHONPATH="/code/:${PYTHONPATH}"
 
-CMD ["pytest", "-p", "no:cacheprovider"]
+CMD ["pytest"]
 
 RUN mkdir /code
 WORKDIR /code
@@ -23,6 +23,7 @@ RUN pip install --upgrade pip
 RUN pip install -r /tmp/requirements-test.txt
 
 COPY .flake8 /code/
+COPY pytest.ini /code/
 COPY *.py /code/
 
 USER jql

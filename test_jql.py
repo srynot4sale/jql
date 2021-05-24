@@ -1,3 +1,5 @@
+import pytest
+
 from rich.console import Console
 
 from user import User
@@ -7,7 +9,26 @@ console = Console()
 print = console.print
 
 
-def test_endtoend():
+class dbclass:
+    def query(self, query, expected):
+        tx = self.client.new_transaction()
+        resp = tx.q(query)
+        tx.commit()
+        assert resp == expected
+
+
+@pytest.fixture
+def db():
+    user = User("testuser", dsn="bolt://db:7687")
+    client = user.get_client('testclient')
+
+    # Delete all in db
+    wrapper = dbclass()
+    wrapper.client = client
+    yield wrapper
+
+
+def test_endtoend(db):
     examples = [
         "CREATE go to supermarket #todo #todo/completed",
         "CREATE do dishes #todo #chores",
@@ -20,11 +41,7 @@ def test_endtoend():
         "LIST do dishes",
     ]
 
-    aaron = User("aaron", dsn="bolt://db:7687")
-    client = aaron.get_client('jql')
-
     for ex in examples:
         print(ex)
-        tx = client.new_transaction()
-        tx.q(ex)
-        tx.commit()
+        db.query(ex, "")
+

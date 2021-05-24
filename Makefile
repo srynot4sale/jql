@@ -11,7 +11,7 @@ help:
 build: ## Build api image
 	docker-compose -f docker-compose.test.yml build
 
-test: ## Run tests
+test: build ## Run tests
 	docker-compose -f docker-compose.test.yml up -d db
 	docker-compose -f docker-compose.test.yml up jql
 

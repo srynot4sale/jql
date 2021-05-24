@@ -3,6 +3,8 @@
 ignore =
  # long lines
  E501,
+ # use of assert (incompatible with pytest)
+ S101,
 
 exclude =
  .git,
