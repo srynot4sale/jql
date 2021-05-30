@@ -1,53 +1,107 @@
-def parse(query):
-    tokens = query.split(' ')
+from dataclasses import dataclass
 
-    action = tokens[0].lower()
+from lark import Lark, Transformer
 
-    raw = []
-    curr = []
-    values = []
-    for token in tokens[1:]:
-        if token.startswith('#'):
-            if curr:
-                raw.append(' '.join(curr))
-                curr = []
-            raw.append(token)
-        elif token.startswith('@'):
-            if curr:
-                raw.append(' '.join(curr))
-                curr = []
-            raw.append(token)
-        else:
-            curr.append(token)
-    if curr:
-        raw.append(' '.join(curr))
 
-    for r in raw:
-        if r.startswith('@'):
-            values.append(('id', r.lstrip('@')))
-            continue
+jql_parser = Lark(r"""
+    action: "CREATE" content data*     -> create
+          | "CREATE" data+             -> create
+          | "SET" id content data*     -> set
+          | "SET" id data+             -> set
+          | "GET" id                   -> get
+          | "HISTORY" id               -> history
+          | "LIST" content data*       -> list
+          | "LIST" data+               -> list
 
-        if not r.startswith('#'):
-            values.append(('content', r))
-            continue
+    ?data: tag
+         | fact
+         | value
 
-        if "/" in r:
-            tag, fact = r.split("/", 1)
-        else:
-            tag = r
-            fact = None
+    id      : "@" INT
+    tag     : "#" WORD 
+    fact    : tag "/" CNAME
+    value   : fact "=" /[^ ]+/
+    content : /[^#]+/
 
-        tag = tag.lstrip('#')
-        if fact is None:
-            values.append(('fact', (tag, None, None)))
-        else:
-            if '=' in fact:
-                f, v = fact.split('=', 1)
-                values.append(('fact', (tag, f, v)))
-            else:
-                values.append(('fact', (tag, fact, None)))
+    %import common.WORD
+    %import common.CNAME
+    %import common.INT
+    %import common.WS
+    %ignore WS
+    """, start='action')
 
-    # print(f'action: {action}')
-    # print(f'raw: {raw}')
-    # print(f'values: {values}')
-    return (query, action, raw, values)
+
+@dataclass(frozen=True)
+class ItemRef:
+    id: str
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}({str(self)})"
+
+    def __str__(self):
+        return f"@{self.id}"
+
+
+@dataclass(frozen=True)
+class Tag:
+    tag: str
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}({str(self)})"
+
+    def __str__(self):
+        return f"#{self.tag}"
+
+
+@dataclass(frozen=True)
+class Fact(Tag):
+    fact: str
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}({str(self)})"
+
+    def __str__(self):
+        return f'{super().__str__()}/{self.fact}'
+
+
+@dataclass(frozen=True)
+class FactValue(Fact):
+    value: str
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}({str(self)})"
+
+    def __str__(self):
+        return f'{super().__str__()}={self.value}'
+
+
+@dataclass(frozen=True)
+class Content(FactValue):
+    def __init__(self, content: str):
+        object.__setattr__(self, "tag", "db")
+        object.__setattr__(self, "fact", "content")
+        object.__setattr__(self, "value", content)
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}({str(self)})"
+
+    def __str__(self):
+        return self.value
+
+
+class JqlTransformer(Transformer):
+    def id(self, i):
+        return ItemRef(i[0].value)
+
+    def tag(self, i):
+        return Tag(i[0].value)
+
+    def fact(self, i):
+        return Fact(i[0].tag, i[1].value)
+
+    def value(self, i):
+        return FactValue(i[0].tag, i[0].fact, i[1].value)
+
+    def content(self, i):
+        return Content(i[0].value.strip())
+

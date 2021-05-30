@@ -1,26 +1,18 @@
 import datetime
-from rich.table import Table
-from rich.console import Console
 
-from parser import parse
-from item import Item
-from fact import F
-
-
-console = Console()
-print = console.print
-
-TRANSACTIONS = {}
+from parser import jql_parser, JqlTransformer, ItemRef, Tag, Fact, FactValue, Content
 
 
 class Transaction:
-    def __init__(self, user, client):
-        self._id = None
-        self.timestamp = None
-        self.query = None
+    def __init__(self, user, client, query):
+        self.query = query
         self.user = user
         self.client = client
-        self.transaction = self.client.session.begin_transaction()
+        self.tx = self.client.store.new_transaction()
+        self.changeset = {}
+
+        self.response = self.q(self.query)
+        self.commit()
 
     def __repr__(self):
         return self.query
@@ -37,7 +29,6 @@ class Transaction:
                 raise Exception(f"{new_id} transaction should not already exist")
 
             self._id = new_id
-            self.timestamp = str(datetime.datetime.now().timestamp())[:-3]
             TRANSACTIONS[new_id] = self
 
         return self._id
@@ -47,10 +38,10 @@ class Transaction:
         raise Exception("Cannot set transaction id manually")
 
     def commit(self):
-        self.transaction.commit()
+        self.changeset = self.tx.commit()
 
     def is_closed(self):
-        return self.transaction.closed()
+        return self.tx.closed is True
 
     def run(self, query, data):
         return self.transaction.run(query, data)
@@ -67,16 +58,6 @@ class Transaction:
         item = Item(self, id)
         item._set_facts(facts)
         return item
-
-    def create_item(self, content=None):
-        q = self.get_one("CREATE (a:db) RETURN id(a) AS node_id", {})
-        new_id = str(q['node_id'])
-
-        i = Item(self, new_id)
-        i.add_fact(self, 'db', 'id', new_id, special=True)
-        if content is not None:
-            i.set_content(self, content)
-        return i
 
     def get_many(self, tags=None, facts=None):
         tags = tags or []
@@ -101,29 +82,32 @@ class Transaction:
             raise Exception("Transaction already completed")
 
         self.query = query
-        _, action, raw, values = parse(query)
+        tree = jql_parser.parse(query)
+        ast = JqlTransformer().transform(tree)
+        print(ast)
+        action = ast.data
+        values = ast.children
+        print(values)
 
         if action == 'create':
             if not values:
                 raise Exception("No data supplied")
 
             content = None
-            for t, value in values:
-                if t == "id":
+            for value in values:
+                if isinstance(value, ItemRef):
                     raise Exception("Not accepting ID's in a create")
-                if t == "content":
+                if isinstance(value, Content):
                     content = value
 
-            item = self.create_item(content)
-            for t, v in values:
-                if t == "content":
-                    continue
-                tag, fact, value = v
-                item.add_fact(self, tag, fact, value)
+            item = self.tx.create_item(content)
+            facts = [v for v in values if not isinstance(v, Content)]
 
-            item.print_item()
-            print(f"Created @{item.id}")
-            print()
+            if facts:
+                item = self.tx.add_facts(item, facts)
+
+            self.commit()
+            return item
 
         if action == 'set':
             if len(values) < 2:
@@ -149,13 +133,12 @@ class Transaction:
             if not values:
                 raise Exception("No data supplied")
 
-            if values[0][0] != 'id':
+            if not isinstance(values[0], ItemRef):
                 raise Exception(f"Expected an ID first - got {values[0][0]}")
 
-            _, id = values[0]
-            item = self.get_item(id)
-            item.print_item(history=(action == 'history'))
-            print()
+            item = self.tx.get_item(values[0])
+            # item.print_item(history=(action == 'history'))
+            return item
 
         if action == 'list':
             if not values:

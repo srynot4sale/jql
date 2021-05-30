@@ -11,8 +11,6 @@ RUN apt-get update && \
 
 ENV PYTHONPATH="/code/:${PYTHONPATH}"
 
-CMD ["pytest"]
-
 RUN mkdir /code
 WORKDIR /code
 
@@ -22,10 +20,12 @@ ADD requirements-test.txt /tmp/
 RUN pip install --upgrade pip
 RUN pip install -r /tmp/requirements-test.txt
 
+CMD ["pytest"]
+
 COPY .flake8 /code/
 COPY pytest.ini /code/
 COPY *.py /code/
 
 USER jql
 
-RUN flake8
+#RUN flake8

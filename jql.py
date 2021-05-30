@@ -31,7 +31,26 @@ while True:
             continue
 
         tx = client.new_transaction()
-        tx.q(i)
+        res = tx.q(i)
         tx.commit()
+
+        res.print_item()
+        print(f"Created @{res.id}")
+        print()
+
     except BaseException as e:
         print(f"Error occured: [{e.__class__.__name__}] {e}")
+
+"""
+    def as_string(self, markup=True):
+        if self.is_content():
+            return self.value
+
+        output = f'[green][bold]#[/bold]{self.tag}[/green]' if markup else f'#{self.tag}'
+        if self.is_fact():
+            output += f'/[orange1]{self.fact}[/orange1]' if markup else f'/{self.fact}'
+            if self.has_value():
+                output += f'=[yellow]{self.value}[/yellow]' if markup else f'={self.value}'
+
+        return output
+"""
