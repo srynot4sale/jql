@@ -4,39 +4,42 @@ from rich.console import Console
 from rich.prompt import Prompt
 
 
-from user import User
+from jql.memory import MemoryStore
 
 
 console = Console()
-print = console.print
+cprint = console.print
 
+store = MemoryStore()
+user = store.get_user("repl")
+client = user.get_client("jql")
 
-aaron = User("aaron")
-client = aaron.get_client('jql')
+cprint('Welcome to JQL')
+cprint('q to quit, h for help')
 
-print('Welcome to JQL')
-print('q to quit, h for help')
-
-print(f"Logged in as {aaron.name}, with client {client.name} at {client.tx}")
+cprint(f"Logged in as {user.name}, with client {client.name} at {client.tx}")
 
 while True:
     try:
         i = Prompt.ask('')
         if i == "q":
-            print('Quitting')
+            cprint('Quitting')
             break
 
         if i == "h":
-            print('HELP!')
+            cprint('HELP!')
             continue
 
-        tx = client.new_transaction()
-        res = tx.q(i)
-        tx.commit()
+        tx = client.new_transaction(i)
 
-        res.print_item()
-        print(f"Created @{res.id}")
-        print()
+        cprint("Changes:")
+        for c in tx.tx.changeset:
+            cprint(c)
+        cprint()
+
+        cprint("Response:")
+        cprint(tx.response.to_dict())
+        cprint()
 
     except BaseException as e:
         print(f"Error occured: [{e.__class__.__name__}] {e}")

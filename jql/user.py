@@ -1,4 +1,4 @@
-from client import Client
+from jql.client import Client
 
 
 class User:

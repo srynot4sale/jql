@@ -1,4 +1,4 @@
-from parser import Content, Tag, FactValue
+from jql.parser import Content, Tag, FactValue
 
 
 class ItemImmutableException(Exception):

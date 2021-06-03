@@ -1,6 +1,6 @@
-from db import Store, ChangeNewItem, ChangeAddFact
-from item import Item
-from parser import Tag
+from jql.db import Store, ChangeNewItem, ChangeAddFact
+from jql.item import Item
+from jql.parser import Tag
 
 
 class MemoryStore(Store):
@@ -25,4 +25,4 @@ class MemoryStore(Store):
             if isinstance(change, ChangeNewItem):
                 self._items[change.id] = Item(change.id, change.facts)
             elif isinstance(change, ChangeAddFact):
-                self._items[change.id] = Item(change.id, self.get_item(change.id).facts.union({change.fact}))
+                self._items[change.item.id] = Item(change.item.id, change.item.facts.union({change.fact}))

@@ -1,6 +1,6 @@
 import datetime
 
-from parser import jql_parser, JqlTransformer, ItemRef, Tag, Fact, FactValue, Content
+from jql.parser import jql_parser, JqlTransformer, ItemRef, Tag, Fact, FactValue, Content
 
 
 class Transaction:
@@ -113,28 +113,21 @@ class Transaction:
             if len(values) < 2:
                 raise Exception("No data supplied")
 
-            if values[0][0] != 'id':
-                raise Exception(f"Expected an ID first - got {values[0][0]}")
+            if not isinstance(values[0], ItemRef):
+                raise Exception(f"Expected an ID first - got {values[0]}")
 
-            _, id = values[0]
-            item = self.get_item(id)
-            for t, val in values[1:]:
-                if t == "content":
-                    tag, fact, value = "db", "content", val
-                else:
-                    tag, fact, value = val
-                item.add_fact(self, tag, fact, value)
+            item = self.tx.get_item(values[0])
+            item = self.tx.add_facts(item, values[1:])
 
-            item.print_item()
-            print(f"Updated @{id}")
-            print()
+            self.commit()
+            return item
 
         if action in ('get', 'history'):
             if not values:
                 raise Exception("No data supplied")
 
             if not isinstance(values[0], ItemRef):
-                raise Exception(f"Expected an ID first - got {values[0][0]}")
+                raise Exception(f"Expected an ID first - got {values[0]}")
 
             item = self.tx.get_item(values[0])
             # item.print_item(history=(action == 'history'))
@@ -144,33 +137,5 @@ class Transaction:
             if not values:
                 raise Exception("No data supplied")
 
-            display = []
-            tags = []
-            facts = []
-            for t, val in values:
-                if t == "content":
-                    display.append(val)
-                elif t == "id":
-                    raise Exception("Can't list an ID")
-                else:
-                    tag, f, v = val
-                    if f is None:
-                        display.append(f'#{tag}')
-                        tags.append(tag)
-                    elif v is None:
-                        display.append(f'#{tag}/{f}')
-                        facts.append(F(tag=tag, fact=f, value=None))
-                    else:
-                        display.append(f'#{tag}/{f}={v}')
-                        facts.append(F(tag=tag, fact=f, value=v))
-
-            table = Table(title=f"List all items matching the search terms: {' '.join(display)}")
-            table.add_column("item")
-
             # Check each data item as a current fact that matches every search term
-            for item in self.get_many(tags=tags, facts=facts):
-                table.add_row(item.summary())
-
-            print()
-            print(table)
-            print()
+            return self.tx.get_items(values)

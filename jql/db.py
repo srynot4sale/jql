@@ -2,9 +2,9 @@ from dataclasses import dataclass
 import datetime
 
 
-from parser import ItemRef
-from user import User
-from item import Item
+from jql.parser import ItemRef, Tag
+from jql.user import User
+from jql.item import Item
 
 
 class Store:
@@ -37,8 +37,8 @@ class ChangeNewItem(Change):
 
 @dataclass()
 class ChangeAddFact(Change):
-    obj: Item
-    fact: any
+    item: Item
+    fact: Tag
 
 
 class DbTransaction:
@@ -74,10 +74,13 @@ class DbTransaction:
 
     def get_item(self, id):
         id = id.id if isinstance(id, ItemRef) else id
-        obj = self._store.get_item(self, id)
-        if not obj:
+        item = self._store.get_item(self, id)
+        if not item:
             raise Exception(f'@{id} does not exist')
-        return obj
+        return item
+
+    def get_many(self, terms):
+        return self._store.get_items(self, terms)
 
     def add_fact(id, f):
         if f.fact is None:

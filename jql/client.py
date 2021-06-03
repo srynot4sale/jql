@@ -1,4 +1,4 @@
-from transaction import Transaction
+from jql.transaction import Transaction
 
 
 class Client:

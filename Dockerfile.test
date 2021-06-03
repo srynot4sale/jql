@@ -24,7 +24,7 @@ CMD ["pytest"]
 
 COPY .flake8 /code/
 COPY pytest.ini /code/
-COPY *.py /code/
+COPY jql/ /code/jql
 
 USER jql
 
