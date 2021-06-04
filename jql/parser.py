@@ -6,7 +6,7 @@ from lark import Lark, Transformer
 jql_parser = Lark(r"""
     action: "CREATE" content data*     -> create
           | "CREATE" data+             -> create
-          | "SET" id content data*     -> set
+          | "SET" id content           -> set
           | "SET" id data+             -> set
           | "GET" id                   -> get
           | "HISTORY" id               -> history

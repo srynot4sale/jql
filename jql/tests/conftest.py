@@ -1,14 +1,23 @@
 import pytest
+import structlog
 
 from jql.memory import MemoryStore
 
 
+log = structlog.get_logger()
+
+
 class dbclass:
     def query(self, query, expected):
+        log.msg("New transasction", query=query)
         tx = self.client.new_transaction(query)
-        print(tx.response)
-        print(tx.response.to_dict())
-        print(tx.tx.changeset)
+        log.msg("Response", response=tx.response)
+        if tx.changeset:
+            log.msg("Changeset", changeset=tx.changeset)
+
+        if tx.response.to_dict() != expected:
+            log.msg("Response", response=tx.response.to_dict())
+            log.msg("Expected", response=expected)
         assert tx.response.to_dict() == expected
 
 

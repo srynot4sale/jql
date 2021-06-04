@@ -1,3 +1,5 @@
 lark
 neo4j
 rich
+structlog
+colorama

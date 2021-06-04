@@ -1,6 +1,4 @@
-from jql.db import Store, ChangeNewItem, ChangeAddFact
-from jql.item import Item
-from jql.parser import Tag
+from jql.db import Store
 
 
 class MemoryStore(Store):
@@ -8,21 +6,14 @@ class MemoryStore(Store):
         self._transactions = []
         self._items = {}
 
-    def new_item(self, tx):
+    def _new_item_id(self):
         new_id = str(len(self._items.keys()))
         if self._items.get(new_id):
             raise Exception(f"{new_id} item should not already exist")
-        return Item(new_id, {Tag("db")})
+        return new_id
 
-    def add_facts(self, tx, item, facts):
-        return Item(item.id, item.facts.union(set(facts)))
-
-    def get_item(self, tx, id):
+    def _get_item(self, tx, id):
         return self._items.get(id, None)
 
-    def apply(self, tx):
-        for change in tx.changeset:
-            if isinstance(change, ChangeNewItem):
-                self._items[change.id] = Item(change.id, change.facts)
-            elif isinstance(change, ChangeAddFact):
-                self._items[change.item.id] = Item(change.item.id, change.item.facts.union({change.fact}))
+    def _update_item(self, id, new_item):
+        self._items[id] = new_item
