@@ -22,10 +22,12 @@ RUN pip install -r /tmp/requirements-test.txt
 
 CMD ["pytest"]
 
+COPY mypy.ini /code/
 COPY .flake8 /code/
 COPY pytest.ini /code/
 COPY jql/ /code/jql
 
 USER jql
 
-#RUN flake8
+RUN flake8
+RUN mypy -p jql || true

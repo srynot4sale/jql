@@ -1,48 +1,55 @@
-#!./venv/bin/python3
+from prompt_toolkit import PromptSession, HTML, print_formatted_text as print
+from prompt_toolkit.completion import WordCompleter
+from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
+import structlog
 
-from rich.console import Console
-from rich.prompt import Prompt
 
-
+from jql.client import Client
 from jql.memory import MemoryStore
 
 
-console = Console()
-cprint = console.print
+log = structlog.get_logger()
 
-store = MemoryStore()
-user = store.get_user("repl")
-client = user.get_client("jql")
+client = Client(store=MemoryStore(), client="repl:user")
 
-cprint('Welcome to JQL')
-cprint('q to quit, h for help')
+print('Welcome to JQL')
+print('q to quit, h for help')
 
-cprint(f"Logged in as {user.name}, with client {client.name} at {client.tx}")
+print(f"Logged in as {client.user}, with client {client.name}")
+
+completer = WordCompleter(["CREATE", "SET", "GET", "HISTORY", "LIST"])
+session: PromptSession[str] = PromptSession('> ', completer=completer, auto_suggest=AutoSuggestFromHistory())
 
 while True:
     try:
-        i = Prompt.ask('')
+        i = session.prompt()
         if i == "q":
-            cprint('Quitting')
+            print('Quitting')
             break
 
         if i == "h":
-            cprint('HELP!')
+            print('HELP!')
             continue
 
-        tx = client.new_transaction(i)
+        tx = client.store.new_transaction()
+        response = tx.q(i)
 
-        cprint("Changes:")
-        for c in tx.tx.changeset:
-            cprint(c)
-        cprint()
+        if tx.changeset:
+            print(HTML("<b>Changes:</b>"))
+            for c in tx.changeset:
+                print(f"  - {str(c)}")
+            print()
 
-        cprint("Response:")
-        cprint(tx.response.to_dict())
-        cprint()
+        print(HTML("<b>Response:</b>"))
+        print(str(response))
+        print()
 
-    except BaseException as e:
-        print(f"Error occured: [{e.__class__.__name__}] {e}")
+    except KeyboardInterrupt:
+        continue
+    except EOFError:
+        break
+    except BaseException:
+        log.exception("Error occured")
 
 """
     def as_string(self, markup=True):

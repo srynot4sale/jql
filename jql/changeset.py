@@ -1,8 +1,7 @@
 from dataclasses import dataclass
 
 
-from jql.parser import Tag
-from jql.item import Item
+from jql.types import Item, Prop
 
 
 @dataclass()
@@ -12,11 +11,13 @@ class Change:
 
 @dataclass()
 class CreateItem(Change):
-    id: str
-    facts: set
+    item: Item
+
+    def __repr__(self) -> str:
+        return f"CreateItem({self.item.facts})"
 
 
 @dataclass()
 class AddFact(Change):
     item: Item
-    new_fact: Tag
+    new_fact: Prop

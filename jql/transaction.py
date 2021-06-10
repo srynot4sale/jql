@@ -1,7 +1,13 @@
+from __future__ import annotations
 import datetime
 import structlog
+import typing
 
-from jql.parser import jql_parser, JqlTransformer, ItemRef, Tag, Fact, FactValue, Content
+if typing.TYPE_CHECKING:
+    from jql.db import Store
+
+from jql.parser import jql_parser, JqlTransformer
+from jql.types import Ref, Prop, Item
 import jql.changeset as changeset
 
 
@@ -9,59 +15,52 @@ log = structlog.get_logger()
 
 
 class Transaction:
-    def __init__(self, user, client, query):
+    def __init__(self, store: Store):
         self.timestamp = str(datetime.datetime.now().timestamp())[:-3]
-        self.query = query
-        self.user = user
-        self.client = client
-        self._store = client.store
+        self._store = store
 
-        self.changeset = []
+        self.changeset: typing.List[changeset.Change] = []
         self.closed = False
-        self.response = self.q(self.query)
-        self.commit()
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"Transaction({self.query})"
 
-    def commit(self):
-        self._store.apply_changeset(self)
+    def commit(self) -> None:
+        self._store.apply_changeset(self.changeset)
         self.closed = True
 
-    def is_closed(self):
+    def is_closed(self) -> bool:
         return self.closed is True
 
-    def create_item(self, content=None):
-        item = self._store.new_item(self)
-        self.changeset.append(changeset.CreateItem(id=item.id, facts=item.facts))
-
-        if content is not None:        
-            item = self.add_facts(item, {content})
-
+    def create_item(self, props: typing.Set[Prop]) -> Item:
+        item = self._store.new_item(props)
+        self.changeset.append(changeset.CreateItem(item=item))
+        self.commit()
         return item
 
-    def add_facts(self, item, facts):
+    def update_item(self, ref: Ref, props: typing.Set[Prop]) -> Item:
+        item = self._add_facts(self.get_item(ref), props)
+        self.commit()
+        return item
+
+    def _add_facts(self, item: Item, facts: typing.Set[Prop]) -> Item:
         for c in self.changeset:
-            if isinstance(c, changeset.CreateItem) and c.id == item.id:
-                c.facts |= set(facts)
+            if isinstance(c, changeset.CreateItem) and c.item == item:
+                c.item = c.item.add_facts(facts)
                 break
         else:
             for fact in facts:
                 self.changeset.append(changeset.AddFact(item=item, new_fact=fact))
 
-        return self._store.add_facts(self, item, facts)
+        return item.add_facts(facts)
 
-    def get_item(self, id):
-        id = id.id if isinstance(id, ItemRef) else id
-        item = self._store.get_item(self, id)
+    def get_item(self, ref: Ref) -> Item:
+        item = self._store.get_item(ref)
         if not item:
             raise Exception(f'@{id} does not exist')
         return item
 
-    def get_many(self, terms):
-        return self._store.get_items(self, terms)
-
-    def q(self, query):
+    def q(self, query: str) -> Item:
         if self.is_closed():
             raise Exception("Transaction already completed")
 
@@ -76,49 +75,31 @@ class Transaction:
             if not values:
                 raise Exception("No data supplied")
 
-            content = None
-            for value in values:
-                if isinstance(value, ItemRef):
-                    raise Exception("Not accepting ID's in a create")
-                if isinstance(value, Content):
-                    content = value
-
-            item = self.create_item(content)
-            facts = [v for v in values if not isinstance(v, Content)]
-
-            if facts:
-                item = self.add_facts(item, facts)
-
-            self.commit()
-            return item
+            return self.create_item(values)
 
         if action == 'set':
             if len(values) < 2:
                 raise Exception("No data supplied")
 
-            if not isinstance(values[0], ItemRef):
+            if not isinstance(values[0], Ref):
                 raise Exception(f"Expected an ID first - got {values[0]}")
 
-            item = self.get_item(values[0])
-            item = self.add_facts(item, values[1:])
-
-            self.commit()
-            return item
+            return self.update_item(values[0], values[1:])
 
         if action in ('get', 'history'):
             if not values:
                 raise Exception("No data supplied")
 
-            if not isinstance(values[0], ItemRef):
-                raise Exception(f"Expected an ID first - got {values[0]}")
+            if not isinstance(values[0], Ref):
+                raise Exception(f"Expected a ref first - got {values[0]}")
 
-            item = self.get_item(values[0])
-            # item.print_item(history=(action == 'history'))
-            return item
+            return self.get_item(values[0])
 
-        if action == 'list':
-            if not values:
-                raise Exception("No data supplied")
+#        if action == 'list':
+#            if not values:
+#                raise Exception("No data supplied")
 
             # Check each data item as a current fact that matches every search term
-            return self.get_items(values)
+#            return self.get_items(values)
+
+        raise Exception(f"Unknown query '{query}'")

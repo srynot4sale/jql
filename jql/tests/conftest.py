@@ -1,31 +1,41 @@
 import pytest
 import structlog
+import typing
 
+
+from jql.client import Client
 from jql.memory import MemoryStore
+from jql.types import Item, ItemDict
 
 
 log = structlog.get_logger()
 
 
 class dbclass:
-    def query(self, query, expected):
+    client: Client
+
+    def query(self, query: str, expected: ItemDict) -> Item:
         log.msg("New transasction", query=query)
-        tx = self.client.new_transaction(query)
-        log.msg("Response", response=tx.response)
+
+        tx = self.client.store.new_transaction()
+        response = tx.q(query)
+
+        log.msg("Response", response=response)
         if tx.changeset:
             log.msg("Changeset", changeset=tx.changeset)
 
-        if tx.response.to_dict() != expected:
-            log.msg("Response", response=tx.response.to_dict())
+        if response.as_dict() != expected:
+            log.msg("Response", response=response.as_dict())
             log.msg("Expected", response=expected)
-        assert tx.response.to_dict() == expected
+
+        assert response.as_dict() == expected
+
+        return response
 
 
 @pytest.fixture
-def db():
-    store = MemoryStore()
-    user = store.get_user("testuser")
-    client = user.get_client('testclient')
+def db() -> typing.Iterator[dbclass]:
+    client = Client(store=MemoryStore(), client="pytest:testuser")
 
     # Delete all in db
     wrapper = dbclass()

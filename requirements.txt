@@ -1,5 +1,6 @@
 lark
 neo4j
-rich
 structlog
 colorama
+hashids
+prompt_toolkit

@@ -1,107 +1,50 @@
-from dataclasses import dataclass
-
 from lark import Lark, Transformer
+
+from jql.types import Ref, Tag, FactFlag, FactValue, Content
 
 
 jql_parser = Lark(r"""
-    action: "CREATE" content data*     -> create
-          | "CREATE" data+             -> create
+    action: "CREATE" data+             -> create
+          | "CREATE" content data*     -> create
           | "SET" id content           -> set
           | "SET" id data+             -> set
           | "GET" id                   -> get
           | "HISTORY" id               -> history
-          | "LIST" content data*       -> list
           | "LIST" data+               -> list
+          | "LIST" content data*       -> list
 
     ?data: tag
          | fact
          | value
 
-    id      : "@" INT
-    tag     : "#" WORD 
+    id      : "@" ID
+    tag     : "#" WORD
     fact    : tag "/" CNAME
     value   : fact "=" /[^ ]+/
     content : /[^#]+/
 
+    ID      : HEXDIGIT+
+    HEXDIGIT: "a".."f"|DIGIT
     %import common.WORD
     %import common.CNAME
-    %import common.INT
+    %import common.DIGIT
     %import common.WS
     %ignore WS
     """, start='action')
 
 
-@dataclass(frozen=True)
-class ItemRef:
-    id: str
-
-    def __repr__(self):
-        return f"{self.__class__.__name__}({str(self)})"
-
-    def __str__(self):
-        return f"@{self.id}"
-
-
-@dataclass(frozen=True)
-class Tag:
-    tag: str
-
-    def __repr__(self):
-        return f"{self.__class__.__name__}({str(self)})"
-
-    def __str__(self):
-        return f"#{self.tag}"
-
-
-@dataclass(frozen=True)
-class Fact(Tag):
-    fact: str
-
-    def __repr__(self):
-        return f"{self.__class__.__name__}({str(self)})"
-
-    def __str__(self):
-        return f'{super().__str__()}/{self.fact}'
-
-
-@dataclass(frozen=True)
-class FactValue(Fact):
-    value: str
-
-    def __repr__(self):
-        return f"{self.__class__.__name__}({str(self)})"
-
-    def __str__(self):
-        return f'{super().__str__()}={self.value}'
-
-
-@dataclass(frozen=True)
-class Content(FactValue):
-    def __init__(self, content: str):
-        object.__setattr__(self, "tag", "db")
-        object.__setattr__(self, "fact", "content")
-        object.__setattr__(self, "value", content)
-
-    def __repr__(self):
-        return f"{self.__class__.__name__}({str(self)})"
-
-    def __str__(self):
-        return self.value
-
-
 class JqlTransformer(Transformer):
-    def id(self, i):
-        return ItemRef(i[0].value)
+    def id(self, i) -> Ref:
+        return Ref(i[0].value)
 
-    def tag(self, i):
+    def tag(self, i) -> Tag:
         return Tag(i[0].value)
 
-    def fact(self, i):
-        return Fact(i[0].tag, i[1].value)
+    def fact(self, i) -> FactFlag:
+        return FactFlag(i[0].tag, i[1].value)
 
-    def value(self, i):
+    def value(self, i) -> FactValue:
         return FactValue(i[0].tag, i[0].fact, i[1].value)
 
-    def content(self, i):
+    def content(self, i) -> Content:
         return Content(i[0].value.strip())
-

@@ -1,12 +1,11 @@
-from jql.transaction import Transaction
+from jql.db import Store
 
 
 class Client:
-    def __init__(self, user, store, name, tx):
-        self.user = user
-        self.store = store
-        self.name = name
-        self.tx = tx
+    name: str
+    user: str
+    store: Store
 
-    def new_transaction(self, query):
-        return Transaction(user=self.user, client=self, query=query)
+    def __init__(self, store: Store, client: str):
+        self.name, self.user = client.split(':')
+        self.store = store

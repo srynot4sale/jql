@@ -1,40 +1,42 @@
 from abc import ABC, abstractmethod
+import typing
 
 
-from jql.parser import Tag
-from jql.item import Item
-from jql.user import User
-from jql.changeset import CreateItem, AddFact
+from jql.transaction import Transaction
+from jql.types import Tag, Prop, Ref, Item, FactId
+from jql.changeset import Change, CreateItem, AddFact
 
 
 class Store(ABC):
-    def get_user(self, username):
-        return User(username, self)
+    def get_item(self, ref: Ref) -> typing.Optional[Item]:
+        return self._get_item(ref)
 
-    def get_item(self, tx, id):
-        return self._get_item(tx, id)
+    def new_item(self, props: typing.Set[Prop]) -> Item:
+        return Item(facts={Tag("db")}).add_facts(props)
 
-    def new_item(self, tx):
-        return Item(self._new_item_id(), {Tag("db")})
+    def set_ref(self, item: Item, new_ref: Ref) -> Item:
+        if item.ref:
+            raise Exception("Already has an ID")
+        return item.add_facts({FactId("db", new_ref.ref)})
 
-    def add_facts(self, tx, item, facts):
-        return Item(item.id, item.facts.union(set(facts)))
-
-    def apply_changeset(self, tx):
-        for change in tx.changeset:
+    def apply_changeset(self, changeset: typing.List[Change]) -> None:
+        for change in changeset:
             if isinstance(change, CreateItem):
-                self._update_item(change.id, Item(change.id, change.facts))
+                self._create_item(change.item)
             elif isinstance(change, AddFact):
-                self._update_item(change.item.id, Item(change.item.id, change.item.facts.union({change.new_fact})))
+                self._update_item(change.item.ref, change.item.add_facts({change.new_fact}))
+
+    def new_transaction(self) -> Transaction:
+        return Transaction(self)
 
     @abstractmethod
-    def _new_item_id(self):
+    def _get_item(self, ref: Ref) -> typing.Optional[Item]:
         pass
 
     @abstractmethod
-    def _get_item(self, tx, id):
+    def _create_item(self, new_item: Item) -> Item:
         pass
 
     @abstractmethod
-    def _update_item(self, id, new_item):
+    def _update_item(self, ref: Ref, new_item: Item) -> None:
         pass
