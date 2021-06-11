@@ -1,71 +1,89 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import Dict, Literal, Optional, Union, Set
+from typing import Any, Callable, Dict, Set
 
 
 @dataclass(frozen=True)
-class Fact:
+class Prop:
     tag: str
     fact: str
     value: str
 
-    def is_tag(self) -> bool:
-        return not self.fact and not self.value
-
-    def is_fact(self) -> bool:
-        return not self.is_tag()
-
-    def is_ref(self) -> bool:
-        return self.fact == "id"
-
-    def is_primary_ref(self) -> bool:
-        return self.is_ref() and self.tag == "db"
-
-    def is_content(self) -> bool:
-        return self.tag == "db" and self.fact == "content"
-
-    def has_value(self) -> bool:
-        return len(self.value) > 0
-
     def __str__(self) -> str:
-        if self.is_tag():
+        if is_tag(self):
             return f"#{self.tag}"
         else:
-            if self.is_content():
+            if is_content(self):
                 return self.value
-            elif self.is_primary_ref():
+            elif is_primary_ref(self):
                 return f"@{self.value}"
-            elif not self.has_value():
+            elif not has_value(self):
                 return f'#{self.tag}/{self.fact}'
             else:
                 return f'#{self.tag}/{self.fact}={self.value}'
 
 
-def Tag(tag: str) -> Fact:
-    return Fact(tag=tag, fact="", value="")
+def tag_eq(tag: str) -> Callable[[Prop], bool]:
+    return lambda prop: prop.tag == tag
 
 
-def FactFlag(tag: str, fact: str) -> Fact:
-    return Fact(tag=tag, fact=fact, value="")
+def fact_eq(fact: str) -> Callable[[Prop], bool]:
+    return lambda prop: prop.fact == fact
 
 
-def FactValue(tag: str, fact: str, value: str) -> Fact:
-    return Fact(tag=tag, fact=fact, value=value)
+def value_eq(value: str) -> Callable[[Prop], bool]:
+    return lambda prop: prop.value == value
 
 
-def FactRef(tag: str, ref: str) -> Fact:
-    return Fact(tag=tag, fact="id", value=ref)
+has_sys_tag = tag_eq("db")
 
 
-def Ref(ref: str) -> Fact:
+def is_tag(prop: Prop) -> bool:
+    return fact_eq("")(prop) and value_eq("")(prop)
+
+
+def is_fact(prop: Prop) -> bool:
+    return not is_tag(prop)
+
+
+def is_ref(prop: Prop) -> bool:
+    return fact_eq("id")(prop)
+
+
+def is_primary_ref(prop: Prop) -> bool:
+    return is_ref(prop) and has_sys_tag(prop)
+
+
+def is_content(prop: Prop) -> bool:
+    return has_sys_tag(prop) and fact_eq("content")(prop)
+
+
+def has_value(prop: Prop) -> bool:
+    return not value_eq("")(prop)
+
+
+def Tag(tag: str) -> Prop:
+    return Prop(tag=tag, fact="", value="")
+
+
+def FactFlag(tag: str, fact: str) -> Prop:
+    return Prop(tag=tag, fact=fact, value="")
+
+
+def FactValue(tag: str, fact: str, value: str) -> Prop:
+    return Prop(tag=tag, fact=fact, value=value)
+
+
+def FactRef(tag: str, ref: str) -> Prop:
+    return Prop(tag=tag, fact="id", value=ref)
+
+
+def Ref(ref: str) -> Prop:
     return FactRef("db", ref)
 
 
-def Content(value: str) -> Fact:
+def Content(value: str) -> Prop:
     return FactValue(tag="db", fact="content", value=value)
-
-
-ItemDict = Dict[str, Dict[str, Union[str, Literal[True]]]]
 
 
 @dataclass(frozen=True)
@@ -73,51 +91,42 @@ class Item:
     """
     An item is a group of facts at a point in time
     """
-    facts: Set[Fact]
+    props: frozenset[Prop]
 
     @property
-    def ref(self) -> Optional[Ref]:
-        for i in self.facts:
-            if i.is_primary_ref():
-                return Ref(i.value)
-        return None
+    def ref(self) -> str:
+        for f in filter(is_primary_ref, self.props):
+            return f.value
+        else:
+            raise Exception("No ref")
 
     @property
     def content(self) -> str:
-        for i in self.facts:
-            if i.is_content():
-                return str(i)
-        return ""
+        return str(next(filter(is_content, self.props), ""))
 
     def __str__(self) -> str:
         content = self.content
-        facts = []
-        tags = []
-
-        for t in self.tags():
-            tags.append(str(t))
-        for f in self.not_tags():
-            facts.append(str(f))
-
-        data = tags + facts
+        facts = [str(d) for d in self.facts()]
         if content:
-            data.insert(0, content)
+            strs = [content] + list(self.tags()) + facts
 
-        return f"@{self.ref} {' '.join(data)}"
+        return f"@{self.ref} {' '.join(strs)}"
 
-    def as_dict(self) -> ItemDict:
-        i: ItemDict = {}
-        for t in self.tags():
-            i[t] = {}
-        for f in self.not_tags():
-            i[f.tag][f.fact] = f.value if f.has_value() else True
+    def as_dict(self) -> Dict[str, Any]:
+        i: Dict[str, Any] = {}
+        for tag in self.tags():
+            i[tag.lstrip("#")] = {}
+        if self.content:
+            i["db"] = {"content": self.content}
+        for f in self.facts():
+            i[f.tag][f.fact] = f.value if has_value(f) else True
         return i
 
     def tags(self) -> Set[str]:
-        return {f.tag for f in self.facts if f.is_tag() and f.tag != "db"}
+        return {str(Tag(f.tag)) for f in self.props if not has_sys_tag(f)}
 
-    def not_tags(self) -> Set[Fact]:
-        return {f for f in self.facts if f.is_fact() and f.tag != "db"}
+    def facts(self) -> Set[Prop]:
+        return {f for f in self.props if is_fact(f) and not has_sys_tag(f)}
 
-    def add_facts(self, add_facts: Set[Fact]) -> Item:
-        return Item(self.facts.union(add_facts))
+    def add_props(self, add: Set[Prop]) -> Item:
+        return Item(self.props.union(add))

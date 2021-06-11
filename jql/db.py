@@ -1,36 +1,38 @@
 from abc import ABC, abstractmethod
-import typing
+from typing import List, Optional, Set
 
 
 from jql.transaction import Transaction
-from jql.types import Tag, Fact, Ref, Item, FactRef
+from jql.types import Tag, Prop, Item, Ref, is_ref
 from jql.changeset import Change, CreateItem, AddFact
 
 
 class Store(ABC):
-    def get_item(self, ref: Ref) -> typing.Optional[Item]:
+    def get_item(self, ref: Prop) -> Optional[Item]:
         return self._get_item(ref)
 
-    def new_item(self, facts: typing.Set[Fact]) -> Item:
-        return Item(facts={Tag("db")}).add_facts(facts)
+    def new_item(self, props: Set[Prop]) -> Item:
+        return Item(props=frozenset({Tag("db")})).add_props(props)
 
-    def set_ref(self, item: Item, new_ref: Ref) -> Item:
-        if item.ref:
+    def set_ref(self, item: Item, new_ref: Prop) -> Item:
+        if next(filter(is_ref, item.props), False):
             raise Exception("Already has an ID")
-        return item.add_facts({FactRef("db", new_ref.ref)})
+        return item.add_props({Ref(new_ref.value)})
 
-    def apply_changeset(self, changeset: typing.List[Change]) -> None:
+    def apply_changeset(self, changeset: List[Change]) -> List[Item]:
+        resp: List[Item] = []
         for change in changeset:
             if isinstance(change, CreateItem):
-                self._create_item(change.item)
+                resp.append(self._create_item(change.item))
             elif isinstance(change, AddFact):
-                self._update_item(change.item.ref, change.item.add_facts({change.new_fact}))
+                resp.append(self._update_item(change.item.add_props({change.new_fact})))
+        return resp
 
     def new_transaction(self) -> Transaction:
         return Transaction(self)
 
     @abstractmethod
-    def _get_item(self, ref: Ref) -> typing.Optional[Item]:
+    def _get_item(self, ref: Prop) -> Optional[Item]:
         pass
 
     @abstractmethod
@@ -38,5 +40,5 @@ class Store(ABC):
         pass
 
     @abstractmethod
-    def _update_item(self, ref: Ref, new_item: Item) -> None:
+    def _update_item(self, updated_item: Item) -> Item:
         pass

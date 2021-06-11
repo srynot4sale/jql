@@ -5,7 +5,7 @@ import typing
 
 from jql.client import Client
 from jql.memory import MemoryStore
-from jql.types import Item, ItemDict
+from jql.types import Item
 
 
 log = structlog.get_logger()
@@ -14,7 +14,7 @@ log = structlog.get_logger()
 class dbclass:
     client: Client
 
-    def query(self, query: str, expected: ItemDict) -> Item:
+    def query(self, query: str, expected: typing.Dict[str, typing.Any]) -> Item:
         log.msg("New transasction", query=query)
 
         tx = self.client.store.new_transaction()

@@ -1,13 +1,13 @@
 from __future__ import annotations
 import datetime
 import structlog
-import typing
+from typing import List, Set, TYPE_CHECKING
 
-if typing.TYPE_CHECKING:
+if TYPE_CHECKING:
     from jql.db import Store
 
 from jql.parser import jql_parser, JqlTransformer
-from jql.types import Ref, Fact, Item
+from jql.types import Item, Prop, is_ref
 import jql.changeset as changeset
 
 
@@ -19,45 +19,46 @@ class Transaction:
         self.timestamp = str(datetime.datetime.now().timestamp())[:-3]
         self._store = store
 
-        self.changeset: typing.List[changeset.Change] = []
+        self.changeset: List[changeset.Change] = []
         self.closed = False
 
     def __repr__(self) -> str:
         return f"Transaction({self.query})"
 
-    def commit(self) -> None:
-        self._store.apply_changeset(self.changeset)
+    def commit(self) -> List[Item]:
+        resp = self._store.apply_changeset(self.changeset)
         self.closed = True
+        return resp
 
     def is_closed(self) -> bool:
         return self.closed is True
 
-    def create_item(self, facts: typing.Set[Fact]) -> Item:
-        item = self._store.new_item(facts)
+    def create_item(self, props: Set[Prop]) -> Item:
+        item = self._store.new_item(props)
         self.changeset.append(changeset.CreateItem(item=item))
-        self.commit()
-        return item
+        return self.commit()[0]
 
-    def update_item(self, ref: Ref, facts: typing.Set[Fact]) -> Item:
-        item = self._add_facts(self.get_item(ref), facts)
-        self.commit()
-        return item
+    def update_item(self, ref: Prop, props: Set[Prop]) -> Item:
+        self._add_props(self.get_item(ref), props)
+        return self.commit()[0]
 
-    def _add_facts(self, item: Item, facts: typing.Set[Fact]) -> Item:
+    def _add_props(self, item: Item, props: Set[Prop]) -> Item:
         for c in self.changeset:
             if isinstance(c, changeset.CreateItem) and c.item == item:
-                c.item = c.item.add_facts(facts)
+                c.item = c.item.add_props(props)
                 break
         else:
-            for fact in facts:
-                self.changeset.append(changeset.AddFact(item=item, new_fact=fact))
+            for prop in props:
+                self.changeset.append(changeset.AddFact(item=item, new_fact=prop))
 
-        return item.add_facts(facts)
+        return item.add_props(props)
 
-    def get_item(self, ref: Ref) -> Item:
+    def get_item(self, ref: Prop) -> Item:
+        if not is_ref(ref):
+            raise Exception("Not a ref")
         item = self._store.get_item(ref)
         if not item:
-            raise Exception(f'@{id} does not exist')
+            raise Exception(f'{ref} does not exist')
         return item
 
     def q(self, query: str) -> Item:
@@ -81,17 +82,11 @@ class Transaction:
             if len(values) < 2:
                 raise Exception("No data supplied")
 
-            if not isinstance(values[0], Ref):
-                raise Exception(f"Expected an ID first - got {values[0]}")
-
             return self.update_item(values[0], values[1:])
 
         if action in ('get', 'history'):
             if not values:
                 raise Exception("No data supplied")
-
-            if not isinstance(values[0], Ref):
-                raise Exception(f"Expected a ref first - got {values[0]}")
 
             return self.get_item(values[0])
 

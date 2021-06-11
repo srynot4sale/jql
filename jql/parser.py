@@ -1,6 +1,6 @@
 from lark import Lark, Transformer
 
-from jql.types import Ref, Tag, FactFlag, FactValue, Content
+from jql.types import Prop, Ref, Tag, FactFlag, FactValue, Content
 
 
 jql_parser = Lark(r"""
@@ -34,17 +34,17 @@ jql_parser = Lark(r"""
 
 
 class JqlTransformer(Transformer):
-    def id(self, i) -> Ref:
+    def id(self, i) -> Prop:
         return Ref(i[0].value)
 
-    def tag(self, i) -> Tag:
+    def tag(self, i) -> Prop:
         return Tag(i[0].value)
 
-    def fact(self, i) -> FactFlag:
+    def fact(self, i) -> Prop:
         return FactFlag(i[0].tag, i[1].value)
 
-    def value(self, i) -> FactValue:
+    def value(self, i) -> Prop:
         return FactValue(i[0].tag, i[0].fact, i[1].value)
 
-    def content(self, i) -> Content:
+    def content(self, i) -> Prop:
         return Content(i[0].value.strip())
