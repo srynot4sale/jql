@@ -1,76 +1,71 @@
 from __future__ import annotations
-from dataclasses import dataclass, field
-from typing import cast, Dict, Optional, Set, Type, TypeVar
+from dataclasses import dataclass
+from typing import Dict, Literal, Optional, Union, Set
 
 
 @dataclass(frozen=True)
-class Ref:
-    ref: str
-
-    def __str__(self) -> str:
-        return f"@{self.ref}"
-
-
-@dataclass(frozen=True)
-class Prop:
+class Fact:
     tag: str
-    fact: Optional[str]
-    value: Optional[str]
-
-    def __init__(self) -> None:
-        raise Exception("Abstract")
-
-
-@dataclass(frozen=True)
-class Tag(Prop):
-    fact: None = field(init=False, default=None)
-    value: None = field(init=False, default=None)
-
-    def __str__(self) -> str:
-        return f"#{self.tag}"
-
-
-@dataclass(frozen=True)
-class Fact(Prop):
     fact: str
-
-    def __init__(self) -> None:
-        raise Exception("Abstract")
-
-
-@dataclass(frozen=True)
-class FactFlag(Fact):
-    value: None = field(init=False, default=None)
-
-    def __str__(self) -> str:
-        return f'#{self.tag}/{self.fact}'
-
-
-@dataclass(frozen=True)
-class FactValue(Fact):
     value: str
 
+    def is_tag(self) -> bool:
+        return not self.fact and not self.value
+
+    def is_fact(self) -> bool:
+        return not self.is_tag()
+
+    def is_ref(self) -> bool:
+        return self.fact == "id"
+
+    def is_primary_ref(self) -> bool:
+        return self.is_ref() and self.tag == "db"
+
+    def is_content(self) -> bool:
+        return self.tag == "db" and self.fact == "content"
+
+    def has_value(self) -> bool:
+        return len(self.value) > 0
+
     def __str__(self) -> str:
-        return f'#{self.tag}/{self.fact}={self.value}'
+        if self.is_tag():
+            return f"#{self.tag}"
+        else:
+            if self.is_content():
+                return self.value
+            elif self.is_primary_ref():
+                return f"@{self.value}"
+            elif not self.has_value():
+                return f'#{self.tag}/{self.fact}'
+            else:
+                return f'#{self.tag}/{self.fact}={self.value}'
 
 
-@dataclass(frozen=True)
-class FactId(FactValue):
-    fact: str = field(init=False, default="id")
+def Tag(tag: str) -> Fact:
+    return Fact(tag=tag, fact="", value="")
 
 
-@dataclass(frozen=True)
-class Content(FactValue):
-    tag: str = field(init=False, default="db")
-    fact: str = field(init=False, default="content")
-
-    def __str__(self) -> str:
-        return self.value
+def FactFlag(tag: str, fact: str) -> Fact:
+    return Fact(tag=tag, fact=fact, value="")
 
 
-T = TypeVar('T', bound=Prop)
+def FactValue(tag: str, fact: str, value: str) -> Fact:
+    return Fact(tag=tag, fact=fact, value=value)
 
-ItemDict = Dict[str, Dict[str, Optional[str]]]
+
+def FactRef(tag: str, ref: str) -> Fact:
+    return Fact(tag=tag, fact="id", value=ref)
+
+
+def Ref(ref: str) -> Fact:
+    return FactRef("db", ref)
+
+
+def Content(value: str) -> Fact:
+    return FactValue(tag="db", fact="content", value=value)
+
+
+ItemDict = Dict[str, Dict[str, Union[str, Literal[True]]]]
 
 
 @dataclass(frozen=True)
@@ -78,29 +73,31 @@ class Item:
     """
     An item is a group of facts at a point in time
     """
-    facts: Set[Prop]
+    facts: Set[Fact]
 
     @property
     def ref(self) -> Optional[Ref]:
-        for i in self.filter(FactId):
-            if i.tag == "db":
+        for i in self.facts:
+            if i.is_primary_ref():
                 return Ref(i.value)
         return None
 
+    @property
+    def content(self) -> str:
+        for i in self.facts:
+            if i.is_content():
+                return str(i)
+        return ""
+
     def __str__(self) -> str:
-        content = None
+        content = self.content
         facts = []
         tags = []
 
-        for t in self.filter(Tag):
-            if t.tag == "db":
-                continue
+        for t in self.tags():
             tags.append(str(t))
-        for f in self.filter(Fact):
-            if type(f) == Content:
-                content = str(f)
-            else:
-                facts.append(str(f))
+        for f in self.not_tags():
+            facts.append(str(f))
 
         data = tags + facts
         if content:
@@ -112,15 +109,15 @@ class Item:
         i: ItemDict = {}
         for t in self.tags():
             i[t] = {}
-        for f in self.filter(Fact):
-            i[f.tag][f.fact] = f.value if type(f) == FactValue else None
+        for f in self.not_tags():
+            i[f.tag][f.fact] = f.value if f.has_value() else True
         return i
 
-    def filter(self, ptype: Type[T]) -> Set[T]:
-        return {cast(T, f) for f in self.facts if isinstance(f, ptype)}
-
     def tags(self) -> Set[str]:
-        return {f.tag for f in self.filter(Tag)}
+        return {f.tag for f in self.facts if f.is_tag() and f.tag != "db"}
 
-    def add_facts(self, add_facts: Set[Prop]) -> Item:
+    def not_tags(self) -> Set[Fact]:
+        return {f for f in self.facts if f.is_fact() and f.tag != "db"}
+
+    def add_facts(self, add_facts: Set[Fact]) -> Item:
         return Item(self.facts.union(add_facts))

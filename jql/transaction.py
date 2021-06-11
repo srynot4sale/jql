@@ -7,7 +7,7 @@ if typing.TYPE_CHECKING:
     from jql.db import Store
 
 from jql.parser import jql_parser, JqlTransformer
-from jql.types import Ref, Prop, Item
+from jql.types import Ref, Fact, Item
 import jql.changeset as changeset
 
 
@@ -32,18 +32,18 @@ class Transaction:
     def is_closed(self) -> bool:
         return self.closed is True
 
-    def create_item(self, props: typing.Set[Prop]) -> Item:
-        item = self._store.new_item(props)
+    def create_item(self, facts: typing.Set[Fact]) -> Item:
+        item = self._store.new_item(facts)
         self.changeset.append(changeset.CreateItem(item=item))
         self.commit()
         return item
 
-    def update_item(self, ref: Ref, props: typing.Set[Prop]) -> Item:
-        item = self._add_facts(self.get_item(ref), props)
+    def update_item(self, ref: Ref, facts: typing.Set[Fact]) -> Item:
+        item = self._add_facts(self.get_item(ref), facts)
         self.commit()
         return item
 
-    def _add_facts(self, item: Item, facts: typing.Set[Prop]) -> Item:
+    def _add_facts(self, item: Item, facts: typing.Set[Fact]) -> Item:
         for c in self.changeset:
             if isinstance(c, changeset.CreateItem) and c.item == item:
                 c.item = c.item.add_facts(facts)
