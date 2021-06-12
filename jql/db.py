@@ -11,6 +11,9 @@ class Store(ABC):
     def get_item(self, ref: Prop) -> Optional[Item]:
         return self._get_item(ref)
 
+    def get_items(self, search: Iterable[Prop]) -> List[Item]:
+        return self._get_items(search)
+
     def new_item(self, props: Iterable[Prop]) -> Item:
         return Item(props=frozenset({Tag("db")})).add_props(props)
 
@@ -33,6 +36,10 @@ class Store(ABC):
 
     @abstractmethod
     def _get_item(self, ref: Prop) -> Optional[Item]:
+        pass
+
+    @abstractmethod
+    def _get_items(self, search: Iterable[Prop]) -> List[Item]:
         pass
 
     @abstractmethod

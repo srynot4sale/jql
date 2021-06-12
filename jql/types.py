@@ -62,6 +62,10 @@ def has_value(prop: Prop) -> bool:
     return not value_eq("")(prop)
 
 
+def is_flag(prop: Prop) -> bool:
+    return is_fact(prop) and not has_value(prop)
+
+
 def Tag(tag: str) -> Prop:
     return Prop(tag=tag, fact="", value="")
 
@@ -127,6 +131,9 @@ class Item:
 
     def facts(self) -> Set[Prop]:
         return {f for f in self.props if is_fact(f) and not has_sys_tag(f)}
+
+    def flags(self) -> Set[Prop]:
+        return {FactFlag(f.tag, f.fact) for f in self.facts()}
 
     def add_props(self, add: Iterable[Prop]) -> Item:
         return Item(self.props.union(add))

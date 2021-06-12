@@ -45,6 +45,9 @@ class Transaction:
     def get_item(self, ref: Prop) -> None:
         self.response.append(self._get_item(ref))
 
+    def get_items(self, search: Iterable[Prop]) -> None:
+        self.response.extend(self._get_items(search))
+
     def _add_props(self, item: Item, props: Iterable[Prop]) -> Item:
         for c in self.changeset:
             if isinstance(c, changeset.CreateItem) and c.item == item:
@@ -63,6 +66,9 @@ class Transaction:
         if not item:
             raise Exception(f'{ref} does not exist')
         return item
+
+    def _get_items(self, search: Iterable[Prop]) -> List[Item]:
+        return self._store.get_items(search)
 
     def q(self, query: str) -> List[Item]:
         if self.is_closed():
@@ -96,11 +102,11 @@ class Transaction:
             self.get_item(values[0])
             return self.response
 
-#        if action == 'list':
-#            if not values:
-#                raise Exception("No data supplied")
+        if action == 'list':
+            if not values:
+                raise Exception("No data supplied")
 
-            # Check each data item as a current fact that matches every search term
-#            return self.get_items(values)
+            self.get_items(values)
+            return self.response
 
         raise Exception(f"Unknown query '{query}'")

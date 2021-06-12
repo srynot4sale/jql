@@ -37,6 +37,17 @@ def test_facts() -> None:
     assert k.facts() == set({FactFlag("test", "passed"), FactValue("lost", "bet", "twice")})
 
 
+def test_flags() -> None:
+    i = Item(props=frozenset({Ref("23"), FactFlag("test", "passed"), Content("here")}))
+    assert i.flags() == set({FactFlag("test", "passed")})
+
+    j = Item(props=frozenset({FactValue("help", "me", "now"), FactFlag("test", "passed"), Content("here")}))
+    assert j.flags() == set({FactFlag("help", "me"), FactFlag("test", "passed")})
+
+    k = Item(props=frozenset({FactValue("help", "me", "now"), FactFlag("test", "passed"), FactValue("lost", "bet", "twice"), Content("here")}))
+    assert k.flags() == set({FactFlag("help", "me"), FactFlag("test", "passed"), FactFlag("lost", "bet")})
+
+
 def test_dicts() -> None:
     i = Item(props=frozenset({Ref("23"), FactFlag("test", "passed"), Content("here")}))
     assert i.as_dict() == {"test": {"passed": True}, "db": {"content": "here"}}

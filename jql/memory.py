@@ -6,7 +6,7 @@ import uuid
 
 
 from jql.db import Store
-from jql.types import Prop, Ref, Item
+from jql.types import Prop, Ref, Item, is_tag, is_flag
 
 
 class MemoryStore(Store):
@@ -16,6 +16,22 @@ class MemoryStore(Store):
 
     def _get_item(self, ref: Prop) -> typing.Optional[Item]:
         return self._items.get(ref.value, None)
+
+    def _get_items(self, search: typing.Iterable[Prop]) -> typing.List[Item]:
+        matches = []
+        for _, item in self._items.items():
+            exclude = False
+            for prop in search:
+                if is_tag(prop):
+                    if str(prop) not in item.tags():
+                        exclude = True
+                elif prop not in item.props:
+                    if is_flag(prop) and prop in item.flags():
+                        break
+                    exclude = True
+            if not exclude:
+                matches.append(item)
+        return matches
 
     def _create_item(self, item: Item) -> Item:
         hashids = Hashids(salt=self._salt, alphabet=string.hexdigits[:16], min_length=6)

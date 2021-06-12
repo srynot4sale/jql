@@ -65,3 +65,28 @@ def test_basic_tags_normalized(db) -> None:
     # Re-adding same tag shouldn't create two
     db.query_one(f"SET @{resp.ref} #new", item)
     db.query_one(f"GET @{resp.ref}", item)
+
+
+def test_list(db) -> None:
+    item = {"db": {"content": "do dishes"}, "todo": {}, "chores": {}}
+    resp = db.query_one("CREATE do dishes #todo #chores", item)
+    db.query_one(f"GET @{resp.ref}", item)
+
+    db.query("LIST #chores", [item])
+    db.query("LIST #todo", [item])
+    db.query("LIST #notrealtag", [])
+    db.query("LIST do dishes", [item])
+    db.query("LIST dish", [])
+    db.query("LIST #todo #chores", [item])
+    db.query("LIST #todo #fake", [])
+
+    item2 = {"db": {"content": "stuff"}, "chores": {"late": "yes"}}
+    resp = db.query_one("CREATE stuff #chores/late=yes", item2)
+    db.query_one(f"GET @{resp.ref}", item2)
+
+    db.query("LIST #todo", [item])
+    db.query("LIST #chores", [item, item2])
+    db.query("LIST stuff", [item2])
+    db.query("LIST #chores/late", [item2])
+    db.query("LIST #chores/late=yes", [item2])
+    db.query("LIST #chores/late=no", [])
