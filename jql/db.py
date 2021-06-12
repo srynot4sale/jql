@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List, Optional, Set
+from typing import List, Optional, Iterable
 
 
 from jql.transaction import Transaction
@@ -11,7 +11,7 @@ class Store(ABC):
     def get_item(self, ref: Prop) -> Optional[Item]:
         return self._get_item(ref)
 
-    def new_item(self, props: Set[Prop]) -> Item:
+    def new_item(self, props: Iterable[Prop]) -> Item:
         return Item(props=frozenset({Tag("db")})).add_props(props)
 
     def set_ref(self, item: Item, new_ref: Prop) -> Item:

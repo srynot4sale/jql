@@ -1,4 +1,4 @@
-from hashids import Hashids
+from hashids import Hashids  # type: ignore
 import string
 import typing
 import uuid

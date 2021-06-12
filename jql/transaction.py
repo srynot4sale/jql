@@ -1,7 +1,7 @@
 from __future__ import annotations
 import datetime
 import structlog
-from typing import List, Set, TYPE_CHECKING
+from typing import Iterable, List, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from jql.db import Store
@@ -20,29 +20,32 @@ class Transaction:
         self._store = store
 
         self.changeset: List[changeset.Change] = []
+        self.response: List[Item] = []
         self.closed = False
 
     def __repr__(self) -> str:
         return f"Transaction({self.query})"
 
-    def commit(self) -> List[Item]:
-        resp = self._store.apply_changeset(self.changeset)
+    def commit(self) -> None:
+        self.response = self._store.apply_changeset(self.changeset)
         self.closed = True
-        return resp
 
     def is_closed(self) -> bool:
         return self.closed is True
 
-    def create_item(self, props: Set[Prop]) -> Item:
+    def create_item(self, props: Iterable[Prop]) -> None:
         item = self._store.new_item(props)
         self.changeset.append(changeset.CreateItem(item=item))
-        return self.commit()[0]
+        self.commit()
 
-    def update_item(self, ref: Prop, props: Set[Prop]) -> Item:
-        self._add_props(self.get_item(ref), props)
-        return self.commit()[0]
+    def update_item(self, ref: Prop, props: Iterable[Prop]) -> None:
+        self._add_props(self._get_item(ref), props)
+        self.commit()
 
-    def _add_props(self, item: Item, props: Set[Prop]) -> Item:
+    def get_item(self, ref: Prop) -> None:
+        self.response.append(self._get_item(ref))
+
+    def _add_props(self, item: Item, props: Iterable[Prop]) -> Item:
         for c in self.changeset:
             if isinstance(c, changeset.CreateItem) and c.item == item:
                 c.item = c.item.add_props(props)
@@ -53,7 +56,7 @@ class Transaction:
 
         return item.add_props(props)
 
-    def get_item(self, ref: Prop) -> Item:
+    def _get_item(self, ref: Prop) -> Item:
         if not is_ref(ref):
             raise Exception("Not a ref")
         item = self._store.get_item(ref)
@@ -61,7 +64,7 @@ class Transaction:
             raise Exception(f'{ref} does not exist')
         return item
 
-    def q(self, query: str) -> Item:
+    def q(self, query: str) -> List[Item]:
         if self.is_closed():
             raise Exception("Transaction already completed")
 
@@ -69,26 +72,29 @@ class Transaction:
         tree = jql_parser.parse(query)
         ast = JqlTransformer().transform(tree)
         action = ast.data
-        values = ast.children
-        log.msg("Query AST", ast=ast)
+        values: List[Prop] = [c for c in ast.children if isinstance(c, Prop)]
+        log.msg("Query AST", ast=ast.children)
 
         if action == 'create':
             if not values:
                 raise Exception("No data supplied")
 
-            return self.create_item(values)
+            self.create_item(values)
+            return self.response
 
         if action == 'set':
             if len(values) < 2:
                 raise Exception("No data supplied")
 
-            return self.update_item(values[0], values[1:])
+            self.update_item(values[0], values[1:])
+            return self.response
 
         if action in ('get', 'history'):
             if not values:
                 raise Exception("No data supplied")
 
-            return self.get_item(values[0])
+            self.get_item(values[0])
+            return self.response
 
 #        if action == 'list':
 #            if not values:

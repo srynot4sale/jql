@@ -30,4 +30,4 @@ COPY jql/ /code/jql
 USER jql
 
 RUN flake8
-RUN mypy -p jql || true
+RUN mypy -p jql

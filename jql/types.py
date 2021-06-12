@@ -1,6 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Set
+from typing import Any, Callable, Dict, Set, Iterable
 
 
 @dataclass(frozen=True)
@@ -128,5 +128,5 @@ class Item:
     def facts(self) -> Set[Prop]:
         return {f for f in self.props if is_fact(f) and not has_sys_tag(f)}
 
-    def add_props(self, add: Set[Prop]) -> Item:
+    def add_props(self, add: Iterable[Prop]) -> Item:
         return Item(self.props.union(add))

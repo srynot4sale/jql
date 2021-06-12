@@ -41,7 +41,8 @@ while True:
             print()
 
         print(HTML("<b>Response:</b>"))
-        print(str(response))
+        for r in response:
+            print(str(r))
         print()
 
     except KeyboardInterrupt:
