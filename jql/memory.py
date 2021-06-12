@@ -1,4 +1,5 @@
 from hashids import Hashids  # type: ignore
+import pickle  # noqa
 import string
 import typing
 import uuid
@@ -29,3 +30,9 @@ class MemoryStore(Store):
             raise Exception("No ref to update item")
         self._items[updated_item.ref] = updated_item
         return updated_item
+
+    def persist_to_disk(self, f: typing.BinaryIO) -> None:
+        pickle.dump((self._salt, self._items), f)
+
+    def read_from_disk(self, f: typing.BinaryIO) -> None:
+        self._salt, self._items = pickle.load(f)  # noqa

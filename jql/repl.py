@@ -1,3 +1,4 @@
+import os.path
 from prompt_toolkit import PromptSession, HTML, print_formatted_text as print
 from prompt_toolkit.completion import WordCompleter
 from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
@@ -10,22 +11,26 @@ from jql.memory import MemoryStore
 
 log = structlog.get_logger()
 
-client = Client(store=MemoryStore(), client="repl:user")
+store = MemoryStore()
+store_path = "./mem.db"
+if os.path.isfile(store_path):
+    store.read_from_disk(open(store_path, mode="rb"))
+
+client = Client(store=store, client="repl:user")
 
 print('Welcome to JQL')
 print('q to quit, h for help')
 
 print(f"Logged in as {client.user}, with client {client.name}")
 
-completer = WordCompleter(["CREATE", "SET", "GET", "HISTORY", "LIST"])
+completer = WordCompleter(["CREATE", "SET", "GET", "HISTORY", "LIST", "QUIT"])
 session: PromptSession[str] = PromptSession('> ', completer=completer, auto_suggest=AutoSuggestFromHistory())
 
 while True:
     try:
         i = session.prompt()
-        if i == "q":
-            print('Quitting')
-            break
+        if i in ("q", "Q", "QUIT"):
+            raise EOFError
 
         if i == "h":
             print('HELP!')
@@ -48,6 +53,8 @@ while True:
     except KeyboardInterrupt:
         continue
     except EOFError:
+        print('Quitting')
+        store.persist_to_disk(open(store_path, mode="wb"))
         break
     except BaseException:
         log.exception("Error occured")
