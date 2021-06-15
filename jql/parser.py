@@ -2,7 +2,7 @@ from typing import List, Tuple
 
 from lark import Lark, Transformer, Token, Tree
 
-from jql.types import Prop, Ref, Tag, FactFlag, FactValue, Content
+from jql.types import Fact, Ref, Tag, Flag, Value, Content
 
 
 jql_parser = Lark(r"""
@@ -36,17 +36,17 @@ jql_parser = Lark(r"""
 
 
 class JqlTransformer(Transformer[Tree]):
-    def id(self, i: List[Token]) -> Prop:
+    def id(self, i: List[Token]) -> Fact:
         return Ref(i[0].value)
 
-    def tag(self, i: List[Token]) -> Prop:
+    def tag(self, i: List[Token]) -> Fact:
         return Tag(i[0].value)
 
-    def fact(self, i: Tuple[Prop, Token]) -> Prop:
-        return FactFlag(i[0].tag, i[1].value)
+    def fact(self, i: Tuple[Fact, Token]) -> Fact:
+        return Flag(i[0].tag, i[1].value)
 
-    def value(self, i: Tuple[Prop, Token]) -> Prop:
-        return FactValue(i[0].tag, i[0].fact, i[1].value)
+    def value(self, i: Tuple[Fact, Token]) -> Fact:
+        return Value(i[0].tag, i[0].prop, i[1].value)
 
-    def content(self, i: List[Token]) -> Prop:
+    def content(self, i: List[Token]) -> Fact:
         return Content(i[0].value.strip())

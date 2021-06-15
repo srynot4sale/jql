@@ -1,5 +1,5 @@
 def test_basic_create(db) -> None:
-    item = {"db": {"content": "go to supermarket"}, "todo": {"completed": True}}
+    item = {"db": {"content": "go to supermarket"}, "todo": {"completed": ""}}
 
     resp = db.query_one("CREATE go to supermarket #todo #todo/completed", item)
     db.query_one(f"GET @{resp.ref}", item)
@@ -40,12 +40,12 @@ def test_basic_create_add_facts(db) -> None:
     resp = db.query_one("CREATE stuff #chores", item)
     db.query_one(f"GET @{resp.ref}", item)
 
-    item["todo"] = {"immediately": True}
+    item["todo"] = {"immediately": ""}
 
     db.query_one(f"SET @{resp.ref} #todo/immediately", item)
     db.query_one(f"GET @{resp.ref}", item)
 
-    item["todo"]["nottomorrow"] = True
+    item["todo"]["nottomorrow"] = ""
 
     db.query_one(f"SET @{resp.ref} #todo/nottomorrow", item)
     db.query_one(f"GET @{resp.ref}", item)
@@ -76,7 +76,8 @@ def test_list(db) -> None:
     db.query("LIST #todo", [item])
     db.query("LIST #notrealtag", [])
     db.query("LIST do dishes", [item])
-    db.query("LIST dish", [])
+    db.query("LIST dish", [item])
+    db.query("LIST dush", [])
     db.query("LIST #todo #chores", [item])
     db.query("LIST #todo #fake", [])
 
@@ -90,3 +91,23 @@ def test_list(db) -> None:
     db.query("LIST #chores/late", [item2])
     db.query("LIST #chores/late=yes", [item2])
     db.query("LIST #chores/late=no", [])
+
+
+def test_list_by_content(db) -> None:
+    item = {"db": {"content": "do dishes for batman"}, "todo": {}, "chores": {}}
+    item2 = {"db": {"content": "tears for bATman"}, "chores": {"late": "yes"}}
+    resp = db.query_one("CREATE do dishes for batman #todo #chores", item)
+    resp2 = db.query_one("CREATE tears for bATman #chores/late=yes", item2)
+    db.query_one(f"GET @{resp.ref}", item)
+    db.query_one(f"GET @{resp2.ref}", item2)
+
+    db.query("LIST #chores", [item, item2])
+    db.query("LIST #todo", [item])
+    db.query("LIST do dishes", [item])
+    db.query("LIST dish", [item])
+    db.query("LIST nopenope", [])
+    db.query("LIST for batman", [item, item2])
+    db.query("LIST for BATMAN", [item, item2])
+    db.query("LIST for", [item, item2])
+    db.query("LIST bat", [item, item2])
+    db.query("LIST MAN", [item, item2])

@@ -7,8 +7,8 @@ if TYPE_CHECKING:
     from jql.db import Store
 
 from jql.parser import jql_parser, JqlTransformer
-from jql.types import Item, Prop, is_ref
-import jql.changeset as changeset
+from jql.types import Item, Fact, is_ref
+from jql.changeset import Change
 
 
 log = structlog.get_logger()
@@ -19,7 +19,7 @@ class Transaction:
         self.timestamp = str(datetime.datetime.now().timestamp())[:-3]
         self._store = store
 
-        self.changeset: List[changeset.Change] = []
+        self.changeset: List[Change] = []
         self.response: List[Item] = []
         self.closed = False
 
@@ -33,33 +33,31 @@ class Transaction:
     def is_closed(self) -> bool:
         return self.closed is True
 
-    def create_item(self, props: Iterable[Prop]) -> None:
-        item = self._store.new_item(props)
-        self.changeset.append(changeset.CreateItem(item=item))
-        self.commit()
+    def create_item(self, facts: Iterable[Fact]) -> None:
+        if not facts:
+            raise Exception("No data supplied")
 
-    def update_item(self, ref: Prop, props: Iterable[Prop]) -> None:
-        self._add_props(self._get_item(ref), props)
-        self.commit()
+        change = Change(item=None, facts=set(facts))
+        self.changeset.append(change)
 
-    def get_item(self, ref: Prop) -> None:
+    def update_item(self, ref: Fact, facts: Iterable[Fact]) -> None:
+        if not facts:
+            raise Exception("No data supplied")
+
+        item = self._get_item(ref)
+        change = Change(item=item, facts=set(facts))
+        self.changeset.append(change)
+
+    def get_item(self, ref: Fact) -> None:
         self.response.append(self._get_item(ref))
 
-    def get_items(self, search: Iterable[Prop]) -> None:
+    def get_items(self, search: Iterable[Fact]) -> None:
+        if not search:
+            raise Exception("No search criteria supplied")
+
         self.response.extend(self._get_items(search))
 
-    def _add_props(self, item: Item, props: Iterable[Prop]) -> Item:
-        for c in self.changeset:
-            if isinstance(c, changeset.CreateItem) and c.item == item:
-                c.item = c.item.add_props(props)
-                break
-        else:
-            for prop in props:
-                self.changeset.append(changeset.AddFact(item=item, new_fact=prop))
-
-        return item.add_props(props)
-
-    def _get_item(self, ref: Prop) -> Item:
+    def _get_item(self, ref: Fact) -> Item:
         if not is_ref(ref):
             raise Exception("Not a ref")
         item = self._store.get_item(ref)
@@ -67,7 +65,7 @@ class Transaction:
             raise Exception(f'{ref} does not exist')
         return item
 
-    def _get_items(self, search: Iterable[Prop]) -> List[Item]:
+    def _get_items(self, search: Iterable[Fact]) -> List[Item]:
         return self._store.get_items(search)
 
     def q(self, query: str) -> List[Item]:
@@ -78,34 +76,24 @@ class Transaction:
         tree = jql_parser.parse(query)
         ast = JqlTransformer().transform(tree)
         action = ast.data
-        values: List[Prop] = [c for c in ast.children if isinstance(c, Prop)]
+        values: List[Fact] = [c for c in ast.children if isinstance(c, Fact)]
         log.msg("Query AST", ast=ast.children)
 
         if action == 'create':
-            if not values:
-                raise Exception("No data supplied")
-
             self.create_item(values)
+            self.commit()
             return self.response
 
         if action == 'set':
-            if len(values) < 2:
-                raise Exception("No data supplied")
-
             self.update_item(values[0], values[1:])
+            self.commit()
             return self.response
 
         if action in ('get', 'history'):
-            if not values:
-                raise Exception("No data supplied")
-
             self.get_item(values[0])
             return self.response
 
         if action == 'list':
-            if not values:
-                raise Exception("No data supplied")
-
             self.get_items(values)
             return self.response
 
