@@ -3,7 +3,7 @@ from typing import List, Optional, Iterable, Set
 
 
 from jql.transaction import Transaction
-from jql.types import Fact, Item, Ref, is_ref, update_item
+from jql.types import Fact, Item, update_item
 from jql.changeset import Change
 
 
@@ -13,11 +13,6 @@ class Store(ABC):
 
     def get_items(self, search: Iterable[Fact]) -> List[Item]:
         return self._get_items(search)
-
-    def set_ref(self, item: Item, new_ref: Fact) -> Item:
-        if next(filter(is_ref, item.facts), False):
-            raise Exception("Already has an ID")
-        return update_item(item, {Ref(new_ref.value)})
 
     def apply_changeset(self, changeset: List[Change]) -> List[Item]:
         resp: List[Item] = []

@@ -19,8 +19,7 @@ RUN pip install -r /tmp/requirements-test.txt
 
 CMD ["/code/test.sh"]
 
-COPY mypy.ini /code/
-COPY .flake8 /code/
-COPY pytest.ini /code/
+COPY setup.cfg /code/
 COPY jql/ /code/jql
+COPY tests/ /code/tests
 COPY test.sh /code/
