@@ -8,15 +8,15 @@ examples = [
     "CREATE go to supermarket #todo #todo/completed",
     "CREATE do dishes #todo #chores",
     "CREATE book appointment #todo #todo/remind_at=20210412",
-    "SET @d2a #todo/completed",
-    "SET @3dd book appointment at physio",
-    "SET @544 #book #todo",
-    "GET @aaa",
-    "HISTORY @f4a",
-    "LIST #todo/completed",
-    "LIST do dishes",
-    "LIST find #todo",
-    "LIST #todo/remind_at=444"
+    "@d2a SET #todo/completed",
+    "@3dd SET book appointment at physio",
+    "@544 SET #book #todo",
+    "@aaa",
+    "@f4a HISTORY",
+    "#todo/completed",
+    "do dishes",
+    "find #todo",
+    "#todo/remind_at=444"
 ]
 
 
