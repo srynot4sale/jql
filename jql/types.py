@@ -37,15 +37,15 @@ class Fact:
 
 
 def tag_eq(tag: str) -> Callable[[Fact], bool]:
-    return lambda fact: fact.tag == tag
+    return lambda fact: require_fact(fact) and fact.tag == tag
 
 
 def prop_eq(prop: str) -> Callable[[Fact], bool]:
-    return lambda fact: fact.prop == prop
+    return lambda fact: require_fact(fact) and fact.prop == prop
 
 
 def value_eq(value: str) -> Callable[[Fact], bool]:
-    return lambda fact: fact.value == value
+    return lambda fact: require_fact(fact) and fact.value == value
 
 
 def has_prop(fact: Fact) -> bool:
@@ -58,6 +58,12 @@ def has_value(fact: Fact) -> bool:
 
 def has_sys_tag(fact: Fact) -> bool:
     return tag_eq("db")(fact)
+
+
+def require_fact(fact: Fact) -> bool:
+    if not isinstance(fact, Fact):
+        raise Exception(f"Expected a Fact, but received a {fact.__class__.__name__}")
+    return True
 
 
 def is_tag(fact: Fact) -> bool:
@@ -119,18 +125,18 @@ class Item:
         super().__setattr__("facts", frozenset(facts))
 
     @property
-    def ref(self) -> str:
+    def ref(self) -> Fact:
         for f in filter(is_primary_ref, self.facts):
-            return f.value
+            return f
         else:
             raise Exception("No ref")
 
     @property
-    def content(self) -> str:
-        return str(next(filter(is_content, self.facts), ""))
+    def content(self) -> Fact:
+        return next(filter(is_content, self.facts), Content(""))
 
     def __str__(self) -> str:
-        content = self.content
+        content = str(self.content)
         props = [str(d) for d in get_props(self)]
         tags = [str(d) for d in get_tags(self)]
         if content:
@@ -138,15 +144,21 @@ class Item:
 
         return f"@{self.ref} {' '.join(strs)}"
 
-    def as_dict(self) -> Dict[str, Dict[str, str]]:
+    def __dict__(self) -> Dict[str, Dict[str, str]]:  # type: ignore
         i: Dict[str, Dict[str, str]] = {}
         for t in get_tags(self):
             i[t.tag] = {}
         if self.content:
-            i["db"] = {"content": self.content}
+            i["db"] = {"content": str(self.content)}
         for f in get_props(self):
             i[f.tag][f.prop] = f.value
         return i
+
+    def __eq__(self, comparison) -> bool:  # type: ignore
+        if isinstance(comparison, Dict):
+            return self.__dict__() == comparison
+        else:
+            return super().__eq__(comparison)
 
 
 def get_tags(item: Item) -> Set[Fact]:

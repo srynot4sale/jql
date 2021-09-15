@@ -3,16 +3,16 @@ from jql.types import Content, Flag, Value, Item, Ref, Tag, get_tags, get_props,
 
 def test_content() -> None:
     i = Item({Content("here it is")})
-    assert i.content == "here it is"
+    assert str(i.content) == "here it is"
 
     j = Item({Content("here is no 2")})
-    assert i.content == "here it is"
-    assert j.content == "here is no 2"
+    assert str(i.content) == "here it is"
+    assert str(j.content) == "here is no 2"
 
 
 def test_ref() -> None:
     i = Item({Ref("23"), Content("here it is")})
-    assert i.ref == "23"
+    assert str(i.ref) == "@23"
 
 
 def test_tags() -> None:
@@ -50,13 +50,13 @@ def test_flags() -> None:
 
 def test_dicts() -> None:
     i = Item({Ref("23"), Flag("test", "passed"), Content("here")})
-    assert i.as_dict() == {"test": {"passed": ""}, "db": {"content": "here"}}
+    assert i == {"test": {"passed": ""}, "db": {"content": "here"}}
 
     j = Item({Tag("help"), Flag("test", "passed"), Content("here")})
-    assert j.as_dict() == {"help": {}, "test": {"passed": ""}, "db": {"content": "here"}}
+    assert j == {"help": {}, "test": {"passed": ""}, "db": {"content": "here"}}
 
     k = Item({Tag("help"), Tag("me"), Flag("test", "passed"), Value("lost", "bet", "twice"), Content("here")})
-    assert k.as_dict() == {"help": {}, "me": {}, "test": {"passed": ""}, "lost": {"bet": "twice"}, "db": {"content": "here"}}
+    assert k == {"help": {}, "me": {}, "test": {"passed": ""}, "lost": {"bet": "twice"}, "db": {"content": "here"}}
 
     m = Item({Tag("help"), Tag("me"), Flag("test", "passed"), Value("test", "failed", "twice"), Content("here")})
-    assert m.as_dict() == {"help": {}, "me": {}, "test": {"passed": "", "failed": "twice"}, "db": {"content": "here"}}
+    assert m == {"help": {}, "me": {}, "test": {"passed": "", "failed": "twice"}, "db": {"content": "here"}}

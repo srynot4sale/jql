@@ -31,7 +31,7 @@ class MemoryStore(Store):
                     continue
                 elif is_flag(fact) and fact in get_flags(item):
                     continue
-                elif is_content(fact) and str(fact).lower() in item.content.lower():
+                elif is_content(fact) and str(fact).lower() in str(item.content).lower():
                     # Content is a caseless substr match
                     continue
                 elif not is_ref(fact) and has_value(fact) and fact in get_props(item):
@@ -53,7 +53,7 @@ class MemoryStore(Store):
     def _update_item(self, updated_item: Item) -> Item:
         if not updated_item.ref:
             raise Exception("No ref to update item")
-        self._items[updated_item.ref] = updated_item
+        self._items[updated_item.ref.value] = updated_item
         return updated_item
 
     def persist_to_disk(self, f: BinaryIO) -> None:

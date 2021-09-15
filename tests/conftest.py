@@ -1,11 +1,13 @@
+from contextlib import contextmanager
 import pytest
 import structlog
-from typing import Dict, Iterator, List, Literal, Union
+from typing import Dict, Generator, Iterator, List, Literal, Union
 
 
 from jql.client import Client
 from jql.memory import MemoryStore
-from jql.types import Item
+from jql.types import Fact, Item, Ref
+from jql.transaction import Transaction
 
 
 log = structlog.get_logger()
@@ -15,28 +17,41 @@ Expected = Dict[str, Dict[str, Union[str, Literal[True]]]]
 
 class dbclass:
     client: Client
+    _tx: Transaction
+    _last_resp: List[Item]
 
-    def query(self, query: str, expected: List[Expected]) -> List[Item]:
-        log.msg("New transasction", query=query)
+    @contextmanager
+    def tx(self) -> Generator:  # type: ignore
+        self._tx = self.client.store.new_transaction()
+        yield self._tx
+        self._last_resp = self.resp
 
-        tx = self.client.store.new_transaction()
-        response = tx.q(query)
+    @property
+    def resp(self) -> List[Item]:
+        return self._tx.response
 
-        log.msg("Response", response=response)
-        if tx.changeset:
-            log.msg("Changeset", changeset=tx.changeset)
+    @property
+    def single(self) -> Item:
+        assert len(self.resp) == 1
+        return self.resp[0]
 
-        dict_response = [r.as_dict() for r in response]
-        if dict_response != expected:
-            log.msg("Response", response=dict_response)
-            log.msg("Expected", response=expected)
+    @property
+    def last_ref(self) -> Fact:
+        if hasattr(self, '_tx') and len(self._tx.response):
+            res = self._tx.response
+        else:
+            res = self._last_resp
 
-        assert dict_response == expected
+        assert len(res) == 1
 
-        return response
+        # Return a copy of the ref
+        return Ref(res[0].ref.value)
 
-    def query_one(self, query: str, expected: Expected) -> Item:
-        return self.query(query, [expected])[0]
+    def assert_result(self, comparison) -> None:  # type: ignore
+        if not isinstance(comparison, List):
+            comparison = [comparison]
+
+        assert self.resp == comparison
 
 
 @pytest.fixture
@@ -47,3 +62,8 @@ def db() -> Iterator[dbclass]:
     wrapper = dbclass()
     wrapper.client = client
     yield wrapper
+
+
+def pytest_generate_tests(metafunc) -> None:  # type: ignore
+    if "interface" in metafunc.fixturenames:
+        metafunc.parametrize("interface", ["query", "api"])
