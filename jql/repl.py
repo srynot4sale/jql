@@ -6,16 +6,12 @@ import structlog
 
 
 from jql.client import Client
-from jql.memory import MemoryStore
+from jql.sqlite import SqliteStore
 
 
 log = structlog.get_logger()
 
-store = MemoryStore()
-store_path = "./mem.db"
-if os.path.isfile(store_path):
-    store.read_from_disk(open(store_path, mode="rb"))
-
+store = SqliteStore()
 client = Client(store=store, client="repl:user")
 
 print('Welcome to JQL')
@@ -54,7 +50,6 @@ while True:
         continue
     except EOFError:
         print('Quitting')
-        store.persist_to_disk(open(store_path, mode="wb"))
         break
     except BaseException:
         log.exception("Error occured")

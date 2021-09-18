@@ -1,5 +1,4 @@
-import pickle  # noqa
-from typing import Dict, List, Iterable, Set, Optional, BinaryIO
+from typing import Dict, List, Iterable, Set, Optional
 
 
 from jql.db import Store
@@ -50,9 +49,3 @@ class MemoryStore(Store):
 
     def _item_count(self) -> int:
         return len(self._items.keys())
-
-    def persist_to_disk(self, f: BinaryIO) -> None:
-        pickle.dump((self._salt, self._items), f)
-
-    def read_from_disk(self, f: BinaryIO) -> None:
-        self._salt, self._items = pickle.load(f)  # noqa

@@ -142,7 +142,7 @@ class Item:
         if content:
             strs = [content] + tags + props
 
-        return f"@{self.ref} {' '.join(strs)}"
+        return f"{self.ref} {' '.join(strs)}"
 
     def __dict__(self) -> Dict[str, Dict[str, str]]:  # type: ignore
         i: Dict[str, Dict[str, str]] = {}
