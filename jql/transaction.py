@@ -27,6 +27,7 @@ class Transaction:
         return f"Transaction({self.query})"
 
     def commit(self) -> None:
+        log.msg("tx.commit()")
         self.response = self._store.apply_changeset(self.changeset)
         self.closed = True
 
@@ -37,6 +38,7 @@ class Transaction:
         if not facts:
             raise Exception("No data supplied")
 
+        log.msg("tx.create_item()", facts=facts)
         change = Change(item=None, facts=set(facts))
         self.changeset.append(change)
 
@@ -44,17 +46,19 @@ class Transaction:
         if not facts:
             raise Exception("No data supplied")
 
+        log.msg("tx.update_item()", ref=ref, facts=facts)
         item = self._get_item(ref)
         change = Change(item=item, facts=set(facts))
         self.changeset.append(change)
 
     def get_item(self, ref: Fact) -> None:
+        log.msg("tx.get_item()", ref=ref)
         self.response.append(self._get_item(ref))
 
     def get_items(self, search: Iterable[Fact]) -> None:
         if not search:
             raise Exception("No search criteria supplied")
-
+        log.msg("tx.get_items()", search=search)
         self.response.extend(self._get_items(search))
 
     def _get_item(self, ref: Fact) -> Item:
@@ -77,7 +81,7 @@ class Transaction:
         ast = JqlTransformer().transform(tree)
         action = ast.data
         values: List[Fact] = [c for c in ast.children if isinstance(c, Fact)]
-        log.msg("Query AST", ast=ast.children)
+        log.msg(f"Query '{query}' AST", ast=ast.children)
 
         if action == 'create':
             self.create_item(values)

@@ -6,6 +6,7 @@ from typing import Dict, Generator, Iterator, List, Literal, Union
 
 from jql.client import Client
 from jql.memory import MemoryStore
+from jql.sqlite import SqliteStore
 from jql.types import Fact, Item, Ref
 from jql.transaction import Transaction
 
@@ -55,8 +56,8 @@ class dbclass:
 
 
 @pytest.fixture
-def db() -> Iterator[dbclass]:
-    client = Client(store=MemoryStore(), client="pytest:testuser")
+def db(request) -> Iterator[dbclass]:  # type: ignore
+    client = Client(store=request.param(), client="pytest:testuser")
 
     # Delete all in db
     wrapper = dbclass()
@@ -65,5 +66,8 @@ def db() -> Iterator[dbclass]:
 
 
 def pytest_generate_tests(metafunc) -> None:  # type: ignore
+    if "db" in metafunc.fixturenames:
+        metafunc.parametrize("db", [MemoryStore, SqliteStore], indirect=True)
+
     if "interface" in metafunc.fixturenames:
         metafunc.parametrize("interface", ["query", "api"])
