@@ -1,4 +1,3 @@
-import os.path
 from prompt_toolkit import PromptSession, HTML, print_formatted_text as print
 from prompt_toolkit.completion import WordCompleter
 from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
@@ -11,7 +10,8 @@ from jql.sqlite import SqliteStore
 
 log = structlog.get_logger()
 
-store = SqliteStore()
+store_path = "./repl.db"
+store = SqliteStore(location=store_path)
 client = Client(store=store, client="repl:user")
 
 print('Welcome to JQL')

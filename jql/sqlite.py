@@ -13,23 +13,37 @@ log = structlog.get_logger()
 
 class SqliteStore(Store):
     def __init__(self, location: str = ":memory:", salt: str = "") -> None:
-        super().__init__(salt)
-
         self._conn = sqlite3.connect(location)
 
         cur = self._conn.cursor()
-        cur.execute('''CREATE TABLE reflist
-                    (created text, ref text)''')
-        cur.execute('''CREATE TABLE facts
-                    (created text, ref text, tag text, prop text, val text)''')
-        cur.execute('''CREATE TABLE archived
-                    (created text, ref text, tag text, prop text, val text)''')
+        cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", ["config"])
+        if not cur.fetchone():
+            cur.execute('''CREATE TABLE config
+                        (key text, val text)''')
+            cur.execute('''CREATE TABLE reflist
+                        (created text, ref text)''')
+            cur.execute('''CREATE TABLE facts
+                        (created text, ref text, tag text, prop text, val text)''')
+            cur.execute('''CREATE TABLE archived
+                        (created text, ref text, tag text, prop text, val text)''')
+
+            # Generate salt
+            super().__init__(salt)
+
+            cur.execute('INSERT INTO config (key, val) VALUES (?, ?)', ['salt', self._salt])
+        else:
+            # Load salt
+            cur.execute("SELECT val FROM config WHERE key='salt'")
+            loaded_salt = cur.fetchone()[0]
+            super().__init__(loaded_salt)
+
         self._conn.commit()
 
     def _item_count(self) -> int:
         cur = self._conn.cursor()
         cur.execute('INSERT INTO reflist (ref) VALUES (?)', [str(uuid.uuid4())])
         itemid = int(cur.lastrowid)
+        self._conn.commit()
         return itemid
 
     def next_ref(self) -> Fact:
