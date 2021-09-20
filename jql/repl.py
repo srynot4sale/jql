@@ -2,7 +2,7 @@ from prompt_toolkit import PromptSession, HTML, print_formatted_text as print
 from prompt_toolkit.completion import WordCompleter
 from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
 import structlog
-from typing import Dict
+from typing import List, Tuple
 
 
 from jql.client import Client
@@ -23,8 +23,7 @@ print(f"Logged in as {client.user}, with client {client.name}")
 completer = WordCompleter(["CREATE", "SET", "GET", "HISTORY", "LIST", "QUIT"])
 session: PromptSession[str] = PromptSession('> ', completer=completer, auto_suggest=AutoSuggestFromHistory())
 
-shortcuts: Dict[int, str] = {}
-last_shortcut = 0
+shortcuts: List[Tuple[int, str]] = []
 
 while True:
     try:
@@ -37,10 +36,10 @@ while True:
             continue
 
         # Replace any shortcuts
-        for s in shortcuts:
+        for s, ref in shortcuts:
             if f'@{s}' in i:
-                i = i.replace(f'@{s}', f'@{shortcuts[s]}')
-                print(HTML(f"<i>Replacing shortcut @{s} with @{shortcuts[s]}</i>"))
+                i = i.replace(f'@{s}', f'@{ref}')
+                print(HTML(f"<i>Replacing shortcut @{s} with @{ref}</i>"))
 
         tx = client.store.new_transaction()
         response = tx.q(i)
@@ -55,19 +54,15 @@ while True:
         if not response:
             print(HTML(" <i>empty</i>"))
         else:
-            shortcut_count = 0
+            # Reset shortcuts
+            shortcuts = []
             for r in response:
                 shortcut = '  '
-                if r.ref.value in shortcuts.values():
-                    s = list(shortcuts.values()).index(r.ref.value)
-                    shortcut = f'<u>@{list(shortcuts.keys())[s]}</u>'
-                    shortcut_count -= 1
-                elif shortcut_count <= 10:
-                    last_shortcut = (last_shortcut + 1) % 10
-                    shortcuts[last_shortcut] = r.ref.value
-                    shortcut = f'<u>@{last_shortcut}</u>'
-
-                shortcut_count += 1
+                s = len(shortcuts)
+                if s < 10:
+                    ref = r.ref.value
+                    shortcuts.append((s, ref))
+                    shortcut = f'<u>@{s}</u>'
 
                 print(HTML(f" {shortcut} {r}"))
         print()
