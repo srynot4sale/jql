@@ -136,13 +136,17 @@ class Item:
         return next(filter(is_content, self.facts), Content(""))
 
     def __str__(self) -> str:
-        content = str(self.content)
-        props = [str(d) for d in get_props(self)]
-        tags = [str(d) for d in get_tags(self)]
-        if content:
-            strs = [content] + tags + props
+        output: list[str] = []
+        if has_ref(self):
+            output.append(str(self.ref))
 
-        return f"{self.ref} {' '.join(strs)}"
+        if self.content:
+            output.append(str(self.content))
+
+        output.extend([str(d) for d in get_tags(self)])
+        output.extend([str(d) for d in get_props(self)])
+
+        return ' '.join(output)
 
     def __dict__(self) -> Dict[str, Dict[str, str]]:  # type: ignore
         i: Dict[str, Dict[str, str]] = {}
@@ -175,3 +179,7 @@ def get_flags(item: Item) -> Set[Fact]:
 
 def update_item(item: Item, add: Iterable[Fact]) -> Item:
     return Item(item.facts.union(add))
+
+
+def has_ref(item: Item) -> bool:
+    return next(filter(is_primary_ref, item.facts), None) is not None

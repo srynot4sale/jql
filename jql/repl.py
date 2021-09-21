@@ -2,11 +2,12 @@ from prompt_toolkit import PromptSession, HTML, print_formatted_text as print
 from prompt_toolkit.completion import WordCompleter
 from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
 import structlog
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 
 from jql.client import Client
 from jql.sqlite import SqliteStore
+from jql.types import Item, get_props, get_tags, has_ref, has_value
 
 
 log = structlog.get_logger()
@@ -24,6 +25,32 @@ completer = WordCompleter(["CREATE", "SET", "GET", "HISTORY", "LIST", "QUIT"])
 session: PromptSession[str] = PromptSession('> ', completer=completer, auto_suggest=AutoSuggestFromHistory())
 
 shortcuts: List[Tuple[int, str]] = []
+
+
+def render_item(item: Item, shortcut: Optional[int] = None) -> HTML:
+    output = ''
+
+    if shortcut is not None:
+        output += f' <grey>@{shortcut}</grey>'
+    else:
+        output += '   '
+
+    if has_ref(item):
+        output += f' <skyblue><b>{item.ref}</b></skyblue>'
+
+    output += f' {item.content}'
+
+    for p in get_tags(item):
+        output += f' <green>#{p.tag}</green>'
+
+    for p in get_props(item):
+        output += f' <green>#{p.tag}</green>'
+        output += f'/<orange>{p.prop}</orange>'
+        if has_value(p):
+            output += f'=<yellow>{p.value}</yellow>'
+
+    return HTML(output)
+
 
 while True:
     try:
@@ -57,14 +84,14 @@ while True:
             # Reset shortcuts
             shortcuts = []
             for r in response:
-                shortcut = '  '
+                shortcut = None
                 s = len(shortcuts)
                 if s < 10:
                     ref = r.ref.value
                     shortcuts.append((s, ref))
-                    shortcut = f'<u>@{s}</u>'
+                    shortcut = s
 
-                print(HTML(f" {shortcut} {r}"))
+                print(render_item(r, shortcut))
         print()
 
     except KeyboardInterrupt:
@@ -74,17 +101,3 @@ while True:
         break
     except BaseException:
         log.exception("Error occured")
-
-"""
-    def as_string(self, markup=True):
-        if self.is_content():
-            return self.value
-
-        output = f'[green][bold]#[/bold]{self.tag}[/green]' if markup else f'#{self.tag}'
-        if self.is_fact():
-            output += f'/[orange1]{self.fact}[/orange1]' if markup else f'/{self.fact}'
-            if self.has_value():
-                output += f'=[yellow]{self.value}[/yellow]' if markup else f'={self.value}'
-
-        return output
-"""
