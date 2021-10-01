@@ -24,7 +24,6 @@ venv: ## Update virtualenv
 
 .PHONY: test
 test: build ## Run tests
-	docker-compose -f docker-compose.test.yml up -d db
 	docker-compose -f docker-compose.test.yml up jql
 
 .PHONY: lint

@@ -1,17 +1,14 @@
 # vim:ff=unix ts=2 sw=2 ai expandtab
 version: "3.7"
 services:
-  db:
-    image: neo4j:latest
-    environment:
-      NEO4J_AUTH: neo4j/test
   jql:
     image: jql
     init: true
     build:
       context: .
       dockerfile: Dockerfile.test
-    depends_on:
-      - db
     volumes:
       - "./jql/:/code/jql/:ro"
+      - "mypycache:/tmp/mypycache"
+volumes:
+  mypycache:
