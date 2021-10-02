@@ -21,7 +21,7 @@ print('q to quit, h for help')
 
 print(f"Logged in as {client.user}, with client {client.name}")
 
-completer = WordCompleter(["CREATE", "SET", "GET", "HISTORY", "LIST", "QUIT"])
+completer = WordCompleter(["CREATE", "SET", "GET", "HINTS", "HISTORY", "LIST", "QUIT"])
 session: PromptSession[str] = PromptSession('> ', completer=completer, auto_suggest=AutoSuggestFromHistory())
 
 shortcuts: List[Tuple[int, str]] = []
@@ -86,7 +86,7 @@ while True:
             for r in response:
                 shortcut = None
                 s = len(shortcuts)
-                if s < 10:
+                if s < 10 and has_ref(r):
                     ref = r.ref.value
                     shortcuts.append((s, ref))
                     shortcut = s

@@ -2,7 +2,7 @@ from typing import Dict, List, Iterable, Set, Optional
 
 
 from jql.db import Store
-from jql.types import Fact, Item, is_content, is_tag, is_flag, is_ref, has_value, get_tags, get_props, get_flags, update_item
+from jql.types import Fact, Item, is_content, is_tag, is_flag, is_ref, has_value, get_tags, get_props, get_flags, Tag, update_item
 
 
 class MemoryStore(Store):
@@ -46,6 +46,17 @@ class MemoryStore(Store):
         updated_item = update_item(item, new_facts)
         self._items[item.ref.value] = updated_item
         return updated_item
+
+    def _get_tags_as_items(self, prefix: str = '') -> List[Item]:
+        tags: List[str] = []
+        for _, item in self._items.items():
+            for t in get_tags(item):
+                if t.tag in tags:
+                    continue
+                if t.tag.startswith(prefix):
+                    tags.append(t.tag)
+
+        return [Item(facts={Tag(t)}) for t in tags]
 
     def _item_count(self) -> int:
         return len(self._items.keys())

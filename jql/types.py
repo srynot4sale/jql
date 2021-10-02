@@ -152,7 +152,7 @@ class Item:
         i: Dict[str, Dict[str, str]] = {}
         for t in get_tags(self):
             i[t.tag] = {}
-        if self.content:
+        if str(self.content):
             i["db"] = {"content": str(self.content)}
         for f in get_props(self):
             i[f.tag][f.prop] = f.value

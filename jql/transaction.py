@@ -61,6 +61,10 @@ class Transaction:
         log.msg("tx.get_items()", search=search)
         self.response.extend(self._get_items(search))
 
+    def get_hints(self, search: str = '') -> None:
+        log.msg("tx.get_hints()", search=search)
+        self.response.extend(self._store.get_hints(search))
+
     def _get_item(self, ref: Fact) -> Item:
         if not is_ref(ref):
             raise Exception("Not a ref")
@@ -99,6 +103,10 @@ class Transaction:
 
         if action == 'list':
             self.get_items(values)
+            return self.response
+
+        if action == 'hints':
+            self.get_hints(values[0].tag if values else '')
             return self.response
 
         raise Exception(f"Unknown query '{query}'")

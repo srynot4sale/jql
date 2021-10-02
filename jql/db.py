@@ -23,6 +23,9 @@ class Store(ABC):
     def get_items(self, search: Iterable[Fact]) -> List[Item]:
         return self._get_items(search)
 
+    def get_hints(self, search: str = "") -> List[Item]:
+        return self._get_tags_as_items(search)
+
     def apply_changeset(self, changeset: List[Change]) -> List[Item]:
         resp: List[Item] = []
         for change in changeset:
@@ -50,6 +53,10 @@ class Store(ABC):
 
     def id_to_ref(self, i: int) -> Fact:
         return Ref(self._hashstore.encode(i))
+
+    @abstractmethod
+    def _get_tags_as_items(self, prefix: str = '') -> List[Item]:
+        pass
 
     @abstractmethod
     def _get_item(self, ref: Fact) -> Optional[Item]:

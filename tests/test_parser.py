@@ -69,6 +69,11 @@ examples = [
         "#todo/remind_at=444",
         "list",
         [Value("todo", "remind_at", "444")]
+    ],
+    [
+        "HINTS #to",
+        "hints",
+        [Tag("to")]
     ]
 ]
 

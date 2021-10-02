@@ -5,7 +5,7 @@ import uuid
 
 
 from jql.db import Store
-from jql.types import Fact, Item, update_item, is_tag, is_flag, is_content, is_ref, has_value
+from jql.types import Fact, Item, update_item, is_tag, is_flag, is_content, is_ref, has_value, Tag
 
 
 log = structlog.get_logger()
@@ -136,3 +136,22 @@ class SqliteStore(Store):
         for f in facts:
             cur.execute('INSERT INTO facts (ref, tag, prop, val) VALUES (?, ?, ?, ?)', (ref.value, f.tag, f.prop, f.value))
         self._conn.commit()
+
+    def _get_tags_as_items(self, prefix: str = '') -> List[Item]:
+        tags: List[str] = []
+
+        cur = self._conn.cursor()
+        tags_sql = '''
+            SELECT DISTINCT tag
+            FROM facts
+            ORDER BY tag
+        '''
+
+        for row in cur.execute(tags_sql):
+            if row[0] == 'db':
+                continue
+            if row[0] not in tags:
+                if row[0].startswith(prefix):
+                    tags.append(row[0])
+
+        return [Item(facts={Tag(t)}) for t in tags]
