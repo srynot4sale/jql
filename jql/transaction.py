@@ -62,7 +62,7 @@ class Transaction:
         self.response.extend(self._get_items(search))
 
     def get_hints(self, search: str = '') -> None:
-        log.msg("tx.get_hints()", search=search)
+        # log.msg("tx.get_hints()", search=search)
         self.response.extend(self._store.get_hints(search))
 
     def _get_item(self, ref: Fact) -> Item:
@@ -85,7 +85,7 @@ class Transaction:
         ast = JqlTransformer().transform(tree)
         action = ast.data
         values: List[Fact] = [c for c in ast.children if isinstance(c, Fact)]
-        log.msg(f"Query '{query}' AST", ast=ast.children)
+        # log.msg(f"Query '{query}' AST", ast=ast.children)
 
         if action == 'create':
             self.create_item(values)

@@ -1,6 +1,8 @@
+import logging
 from prompt_toolkit import PromptSession, HTML, print_formatted_text as print
-from prompt_toolkit.completion import WordCompleter
+from prompt_toolkit.completion import Completer, Completion
 from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
+import re
 import structlog
 from typing import List, Optional, Tuple
 
@@ -21,8 +23,25 @@ print('q to quit, h for help')
 
 print(f"Logged in as {client.user}, with client {client.name}")
 
-completer = WordCompleter(["CREATE", "SET", "GET", "HINTS", "HISTORY", "LIST", "QUIT"])
-session: PromptSession[str] = PromptSession('> ', completer=completer, auto_suggest=AutoSuggestFromHistory())
+
+class JqlCompleter(Completer):
+    actions = ["CREATE", "SET", "GET", "HINTS", "HISTORY", "LIST", "QUIT"]
+    _FIND_WORD_RE = re.compile(r"([a-zA-Z0-9_@#=\/]+)")
+
+    def get_completions(self, document, complete_event):  # type: ignore
+        word = document.get_word_before_cursor(WORD=False, pattern=self._FIND_WORD_RE)
+        if word.startswith('#'):
+            tx = client.store.new_transaction()
+            response = tx.q(f'HINTS {word}' if len(word) > 1 else 'HINTS')
+            for r in response:
+                yield Completion(str(r), start_position=-len(word))
+        else:
+            for ac in self.actions:
+                if ac.startswith(word):
+                    yield Completion(ac, start_position=-len(word))
+
+
+session: PromptSession[str] = PromptSession('> ', completer=JqlCompleter(), auto_suggest=AutoSuggestFromHistory())
 
 shortcuts: List[Tuple[int, str]] = []
 
