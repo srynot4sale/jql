@@ -9,6 +9,8 @@ __pycache__/
 .pytest_cache/
 ..mypy_cache/
 *.swp
+.stversions/
+.syncthing.*.tmp
 
 /repl.db
 /data/
