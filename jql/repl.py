@@ -1,4 +1,3 @@
-import logging
 from prompt_toolkit import PromptSession, HTML, print_formatted_text as print
 from prompt_toolkit.completion import Completer, Completion
 from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
@@ -87,7 +86,7 @@ while True:
                 i = i.replace(f'@{s}', f'@{ref}')
                 print(HTML(f"<i>Replacing shortcut @{s} with @{ref}</i>"))
 
-        tx = client.store.new_transaction()
+        tx = client.new_transaction()
         response = tx.q(i)
 
         if tx.changeset:

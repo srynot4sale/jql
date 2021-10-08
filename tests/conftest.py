@@ -23,7 +23,7 @@ class dbclass:
 
     @contextmanager
     def tx(self) -> Generator:  # type: ignore
-        self._tx = self.client.store.new_transaction()
+        self._tx = self.client.new_transaction()
         yield self._tx
         self._last_resp = self.resp
 
