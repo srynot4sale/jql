@@ -37,8 +37,10 @@ class Fact:
 
     def __iter__(self) -> Generator:  # type: ignore
         yield 'tag', self.tag
-        yield 'prop', self.prop
-        yield 'value', self.value
+        if len(self.prop):
+            yield 'prop', self.prop
+        if len(self.value):
+            yield 'value', self.value
 
 
 def tag_eq(tag: str) -> Callable[[Fact], bool]:
