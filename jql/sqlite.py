@@ -1,11 +1,14 @@
+import datetime
+import json
 import sqlite3
 import structlog
 from typing import FrozenSet, List, Iterable, Set, Optional
 import uuid
 
 
+from jql.changeset import Change, ChangeSet
 from jql.db import Store
-from jql.types import Fact, Item, update_item, is_tag, is_flag, is_content, is_ref, has_value, Tag
+from jql.types import Fact, Item, Ref, is_tag, is_flag, is_content, is_ref, has_value, Tag, fact_from_dict
 
 
 log = structlog.get_logger()
@@ -21,21 +24,29 @@ class SqliteStore(Store):
             cur.execute('''CREATE TABLE config
                         (key text, val text)''')
             cur.execute('''CREATE TABLE reflist
-                        (created text, ref text)''')
+                        (ref text)''')
             cur.execute('''CREATE TABLE facts
-                        (created text, ref text, tag text, prop text, val text)''')
-            cur.execute('''CREATE TABLE archived
-                        (created text, ref text, tag text, prop text, val text)''')
+                        (changeset int, ref text, tag text, prop text, val text)''')
+            # cur.execute('''CREATE TABLE archived
+            #            (ref text, tag text, prop text, val text)''')
 
-            # Generate salt
-            super().__init__(salt)
+        cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", ["changesets"])
+        if not cur.fetchone():
+            cur.execute('''CREATE TABLE changesets
+                        (client text, created timestamp, query text)''')
+            cur.execute('''CREATE TABLE changes
+                        (changeset int, ref text, facts text, revoke int)''')
 
-            cur.execute('INSERT INTO config (key, val) VALUES (?, ?)', ['salt', self._salt])
+        # Look for existing salt
+        cur.execute("SELECT val FROM config WHERE key='salt'")
+        existing_salt = cur.fetchone()
+        if existing_salt:
+            super().__init__(existing_salt[0])
         else:
-            # Load salt
-            cur.execute("SELECT val FROM config WHERE key='salt'")
-            loaded_salt = cur.fetchone()[0]
-            super().__init__(loaded_salt)
+            # Run initial Setup with supplied salt (or generate one)
+            super().__init__(salt)
+            cur.execute('INSERT INTO config (key, val) VALUES (?, ?)', ['salt', self._salt])
+            cur.execute('INSERT INTO config (key, val) VALUES (?, ?)', ['created', datetime.datetime.now()])
 
         self._conn.commit()
 
@@ -126,9 +137,11 @@ class SqliteStore(Store):
         self._add_facts(item.ref, item.facts)
         return item
 
-    def _update_item(self, item: Item, new_facts: Set[Fact]) -> Item:
-        self._add_facts(item.ref, frozenset(new_facts))
-        updated_item = update_item(item, new_facts)
+    def _update_item(self, ref: Fact, new_facts: Set[Fact]) -> Item:
+        self._add_facts(ref, frozenset(new_facts))
+        updated_item = self._get_item(ref)
+        if not updated_item:
+            raise Exception("Updated item not found")
         return updated_item
 
     def _add_facts(self, ref: Fact, facts: FrozenSet[Fact]) -> None:
@@ -155,3 +168,46 @@ class SqliteStore(Store):
                     tags.append(row[0])
 
         return [Item(facts={Tag(t)}) for t in tags]
+
+    def _record_changeset(self, changeset: ChangeSet) -> int:
+        cur = self._conn.cursor()
+        cur.execute('INSERT INTO changesets (client, created, query) VALUES (?, ?, ?)', (changeset.client, changeset.created, changeset.query))
+        changeset_id = int(cur.lastrowid)
+
+        for c in changeset.changes:
+            ref = c.ref.value if c.ref else ''
+            facts = json.dumps([dict(f) for f in c.facts])
+            cur.execute('INSERT INTO changes (changeset, ref, facts, revoke) VALUES (?, ?, ?, ?)', (changeset_id, ref, facts, c.revoke))
+
+        self._conn.commit()
+
+        return changeset_id
+
+    def _load_changeset(self, changeset_id: int) -> ChangeSet:
+        cur = self._conn.cursor()
+        cur.execute('SELECT client, created, query FROM changesets WHERE rowid = ?', (changeset_id, ))
+        cs = cur.fetchone()
+        if not cs:
+            raise Exception(f'Could not find changeset {changeset_id}')
+
+        changeset = ChangeSet(
+            client=cs[0],
+            created=cs[1],
+            query=cs[2],
+            changes=[]
+        )
+
+        for c in cur.execute('SELECT rowid, ref, revoke, facts FROM changes WHERE changeset = ?', (changeset_id, )):
+            ref = Ref(c[1]) if c[1] else None
+            revoke = c[2]
+            facts = set([fact_from_dict(fact) for fact in json.loads(c[3])])
+
+            change = Change(
+                ref=ref,
+                facts=facts,
+                revoke=revoke
+            )
+
+            changeset.changes.append(change)
+
+        return changeset

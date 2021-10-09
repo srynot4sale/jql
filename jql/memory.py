@@ -1,6 +1,7 @@
 from typing import Dict, List, Iterable, Set, Optional
 
 
+from jql.changeset import ChangeSet
 from jql.db import Store
 from jql.types import Fact, Item, is_content, is_tag, is_flag, is_ref, has_value, get_tags, get_props, get_flags, Tag, update_item
 
@@ -9,7 +10,7 @@ class MemoryStore(Store):
     def __init__(self, salt: str = "") -> None:
         super().__init__(salt)
 
-        # self._transactions = set()
+        self._changesets: List[ChangeSet] = []
         self._items: Dict[str, Item] = {}
 
     def _get_item(self, ref: Fact) -> Optional[Item]:
@@ -42,7 +43,10 @@ class MemoryStore(Store):
         self._items[item.ref.value] = item
         return item
 
-    def _update_item(self, item: Item, new_facts: Set[Fact]) -> Item:
+    def _update_item(self, ref: Fact, new_facts: Set[Fact]) -> Item:
+        item = self._get_item(ref)
+        if not item:
+            raise Exception("Could not find item being updated")
         updated_item = update_item(item, new_facts)
         self._items[item.ref.value] = updated_item
         return updated_item
@@ -60,3 +64,10 @@ class MemoryStore(Store):
 
     def _item_count(self) -> int:
         return len(self._items.keys())
+
+    def _record_changeset(self, changeset: ChangeSet) -> int:
+        self._changesets.append(changeset)
+        return len(self._changesets) - 1
+
+    def _load_changeset(self, changeset_id: int) -> ChangeSet:
+        return self._changesets[changeset_id]

@@ -91,7 +91,7 @@ while True:
 
         if tx.changeset:
             print(HTML("<b>Changes:</b>"))
-            for c in tx.changeset:
+            for c in tx.changeset.changes:
                 print(f"  - {str(c)}")
             print()
 

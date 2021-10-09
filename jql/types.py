@@ -1,6 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import Callable, Dict, Set, Iterable
+from typing import Callable, Dict, Set, Iterable, Generator
 
 
 @dataclass(frozen=True)
@@ -34,6 +34,11 @@ class Fact:
                 return f"Flag(tag='{self.tag}', prop='{self.prop}')"
             else:
                 return f"Value(tag='{self.tag}', prop='{self.prop}', value='{self.value}')"
+
+    def __iter__(self) -> Generator:  # type: ignore
+        yield 'tag', self.tag
+        yield 'prop', self.prop
+        yield 'value', self.value
 
 
 def tag_eq(tag: str) -> Callable[[Fact], bool]:
@@ -114,6 +119,10 @@ def Content(value: str) -> Fact:
     return Value(tag="db", prop="content", value=value)
 
 
+def fact_from_dict(f: dict[str, str]) -> Fact:
+    return Fact(tag=f['tag'], prop=f.get('prop', ''), value=f.get('value', ''))
+
+
 @dataclass(frozen=True)
 class Item:
     """
@@ -163,6 +172,10 @@ class Item:
             return self.__dict__() == comparison
         else:
             return super().__eq__(comparison)
+
+    @property
+    def __iter__(self):  # type: ignore
+        return self.facts.__iter__
 
 
 def get_tags(item: Item) -> Set[Fact]:

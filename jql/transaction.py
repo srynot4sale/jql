@@ -1,14 +1,14 @@
 from __future__ import annotations
 import datetime
 import structlog
-from typing import Iterable, List, TYPE_CHECKING
+from typing import Iterable, List, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from jql.db import Store
 
 from jql.parser import jql_parser, JqlTransformer
 from jql.types import Item, Fact, is_ref
-from jql.changeset import Change
+from jql.changeset import Change, ChangeSet
 
 
 log = structlog.get_logger()
@@ -16,10 +16,11 @@ log = structlog.get_logger()
 
 class Transaction:
     def __init__(self, store: Store):
-        self.timestamp = str(datetime.datetime.now().timestamp())[:-3]
+        self.created = datetime.datetime.now()
         self._store = store
 
-        self.changeset: List[Change] = []
+        self.query: str = ''
+        self.changeset: Optional[ChangeSet] = None
         self.response: List[Item] = []
         self.closed = False
 
@@ -28,8 +29,10 @@ class Transaction:
 
     def commit(self) -> None:
         log.msg("tx.commit()")
-        self.response = self._store.apply_changeset(self.changeset)
-        self.closed = True
+        if self.changeset:
+            cid = self._store.record_changeset(self.changeset)
+            self.response = self._store.apply_changeset(cid)
+            self.closed = True
 
     def is_closed(self) -> bool:
         return self.closed is True
@@ -39,17 +42,14 @@ class Transaction:
             raise Exception("No data supplied")
 
         log.msg("tx.create_item()", facts=facts)
-        change = Change(item=None, facts=set(facts))
-        self.changeset.append(change)
+        self._add_change(Change(ref=None, facts=set(facts)))
 
     def update_item(self, ref: Fact, facts: Iterable[Fact]) -> None:
         if not facts:
             raise Exception("No data supplied")
 
         log.msg("tx.update_item()", ref=ref, facts=facts)
-        item = self._get_item(ref)
-        change = Change(item=item, facts=set(facts))
-        self.changeset.append(change)
+        self._add_change(Change(ref=ref, facts=set(facts)))
 
     def get_item(self, ref: Fact) -> None:
         log.msg("tx.get_item()", ref=ref)
@@ -64,6 +64,17 @@ class Transaction:
     def get_hints(self, search: str = '') -> None:
         # log.msg("tx.get_hints()", search=search)
         self.response.extend(self._store.get_hints(search))
+
+    def _add_change(self, change: Change) -> None:
+        if not self.changeset:
+            self.changeset = ChangeSet(
+                client='',
+                created=self.created,
+                query=self.query,
+                changes=[]
+            )
+
+        self.changeset.changes.append(change)
 
     def _get_item(self, ref: Fact) -> Item:
         if not is_ref(ref):
@@ -84,7 +95,7 @@ class Transaction:
         tree = jql_parser.parse(query)
         ast = JqlTransformer().transform(tree)
         action = ast.data
-        values: List[Fact] = [c for c in ast.children if isinstance(c, Fact)]
+        values: List[Fact] = [c for c in ast.children if isinstance(c, Fact)]  # type: ignore
         # log.msg(f"Query '{query}' AST", ast=ast.children)
 
         if action == 'create':

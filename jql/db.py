@@ -7,7 +7,7 @@ import uuid
 
 from jql.transaction import Transaction
 from jql.types import Fact, Item, is_ref, Ref
-from jql.changeset import Change
+from jql.changeset import ChangeSet
 
 
 class Store(ABC):
@@ -26,13 +26,17 @@ class Store(ABC):
     def get_hints(self, search: str = "") -> List[Item]:
         return self._get_tags_as_items(search)
 
-    def apply_changeset(self, changeset: List[Change]) -> List[Item]:
+    def record_changeset(self, changeset: ChangeSet) -> int:
+        return self._record_changeset(changeset)
+
+    def apply_changeset(self, changeset_id: int) -> List[Item]:
+        changeset = self._load_changeset(changeset_id)
+
         resp: List[Item] = []
-        for change in changeset:
-            if change.item:
-                if not change.item.ref:
-                    raise Exception("No ref to update item")
-                resp.append(self._update_item(change.item, change.facts))
+        for change in changeset.changes:
+            # create change
+            if change.ref:
+                resp.append(self._update_item(change.ref, change.facts))
             else:
                 new_ref = self.next_ref()
                 new_item = Item(facts=frozenset(change.facts.union({new_ref})))
@@ -71,9 +75,17 @@ class Store(ABC):
         pass
 
     @abstractmethod
-    def _update_item(self, item: Item, new_facts: Set[Fact]) -> Item:
+    def _update_item(self, ref: Fact, new_facts: Set[Fact]) -> Item:
         pass
 
     @abstractmethod
     def _item_count(self) -> int:
+        pass
+
+    @abstractmethod
+    def _record_changeset(self, changeset: ChangeSet) -> int:
+        pass
+
+    @abstractmethod
+    def _load_changeset(self, changeset_id: int) -> ChangeSet:
         pass
