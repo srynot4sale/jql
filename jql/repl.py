@@ -1,3 +1,4 @@
+import logging
 from prompt_toolkit import PromptSession, HTML, print_formatted_text as print
 from prompt_toolkit.completion import Completer, Completion
 from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
@@ -11,11 +12,13 @@ from jql.sqlite import SqliteStore
 from jql.types import Item, get_props, get_tags, has_ref, has_value
 
 
-log = structlog.get_logger()
-
 store_path = "./repl.db"
 store = SqliteStore(location=store_path)
-client = Client(store=store, client="repl:user")
+client = Client(store=store, client="repl:user", log_level=logging.ERROR)
+
+
+log = structlog.get_logger()
+
 
 print('Welcome to JQL')
 print('q to quit, h for help')

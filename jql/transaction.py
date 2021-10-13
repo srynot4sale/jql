@@ -11,7 +11,7 @@ from jql.types import Item, Fact, is_ref
 from jql.changeset import Change, ChangeSet
 
 
-log = structlog.get_logger()
+logger = structlog.get_logger()
 
 
 class Transaction:
@@ -23,12 +23,13 @@ class Transaction:
         self.changeset: Optional[ChangeSet] = None
         self.response: List[Item] = []
         self.closed = False
+        self.log = logger.bind()
 
     def __repr__(self) -> str:
         return f"Transaction({self.query})"
 
     def commit(self) -> None:
-        log.msg("tx.commit()")
+        self.log.msg("tx.commit()")
         if self.changeset:
             cid = self._store.record_changeset(self.changeset)
             self.response = self._store.apply_changeset(cid)
@@ -41,24 +42,24 @@ class Transaction:
         if not facts:
             raise Exception("No data supplied")
 
-        log.msg("tx.create_item()", facts=facts)
+        self.log.msg("tx.create_item()", facts=facts)
         self._add_change(Change(ref=None, facts=set(facts)))
 
     def update_item(self, ref: Fact, facts: Iterable[Fact]) -> None:
         if not facts:
             raise Exception("No data supplied")
 
-        log.msg("tx.update_item()", ref=ref, facts=facts)
+        self.log.msg("tx.update_item()", ref=ref, facts=facts)
         self._add_change(Change(ref=ref, facts=set(facts)))
 
     def get_item(self, ref: Fact) -> None:
-        log.msg("tx.get_item()", ref=ref)
+        self.log.msg("tx.get_item()", ref=ref)
         self.response.append(self._get_item(ref))
 
     def get_items(self, search: Iterable[Fact]) -> None:
         if not search:
             raise Exception("No search criteria supplied")
-        log.msg("tx.get_items()", search=search)
+        self.log.msg("tx.get_items()", search=search)
         self.response.extend(self._get_items(search))
 
     def get_hints(self, search: str = '') -> None:
@@ -92,6 +93,7 @@ class Transaction:
             raise Exception("Transaction already completed")
 
         self.query = query
+        self.log = self.log.bind(query=query)
         tree = jql_parser.parse(query)
         ast = JqlTransformer().transform(tree)
         action = ast.data

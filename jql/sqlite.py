@@ -1,7 +1,6 @@
 import datetime
 import json
 import sqlite3
-import structlog
 from typing import FrozenSet, List, Iterable, Set, Optional
 import uuid
 
@@ -9,9 +8,6 @@ import uuid
 from jql.changeset import Change, ChangeSet
 from jql.db import Store
 from jql.types import Fact, Item, Ref, is_tag, is_flag, is_content, is_ref, has_value, Tag, fact_from_dict
-
-
-log = structlog.get_logger()
 
 
 class SqliteStore(Store):
@@ -122,7 +118,6 @@ class SqliteStore(Store):
         '''
 
         facts = {}  # type: ignore
-        log.msg(items_sql)
         for row in cur.execute(items_sql, d):
             if row[0] not in facts.keys():
                 facts[row[0]] = set()
