@@ -2,6 +2,7 @@ from __future__ import annotations
 import datetime
 import structlog
 from typing import Iterable, List, Optional, TYPE_CHECKING
+import uuid
 
 if TYPE_CHECKING:
     from jql.db import Store
@@ -33,8 +34,8 @@ class Transaction:
         self.response.extend(response)
 
     def commit(self) -> None:
-        self.log.msg("tx.commit()")
         if self.changeset:
+            self.log.msg("tx.commit()", changeset=self.changeset)
             cid = self._store.record_changeset(self.changeset)
             self.add_response(self._store.apply_changeset(cid))
             self.closed = True
@@ -53,7 +54,7 @@ class Transaction:
             raise Exception("No data supplied")
         self.start()
         self.log.msg("tx.create_item()", facts=facts)
-        self._add_change(Change(ref=None, facts=set(facts)))
+        self._add_change(Change(uid=str(uuid.uuid4()), facts=set(facts)))
 
     def update_item(self, ref: Fact, facts: Iterable[Fact]) -> None:
         if not facts:

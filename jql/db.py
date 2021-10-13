@@ -37,20 +37,16 @@ class Store(ABC):
             # create change
             if change.ref:
                 resp.append(self._update_item(change.ref, change.facts))
-            else:
-                new_ref = self.next_ref()
+            elif change.uid:
+                new_ref = self._next_ref(change.uid)
                 new_item = Item(facts=frozenset(change.facts.union({new_ref})))
                 resp.append(self._create_item(new_item))
+            else:
+                raise Exception("Unexpected Change format")
         return resp
 
     def new_transaction(self) -> Transaction:
         return Transaction(self)
-
-    def next_ref(self) -> Fact:
-        new_ref = self.id_to_ref(self._item_count())
-        if self._get_item(new_ref):
-            raise Exception(f"{new_ref} item should not already exist")
-        return new_ref
 
     def ref_to_id(self, ref: Fact) -> int:
         return int(self._hashstore.decode(ref.value)[0])
@@ -79,7 +75,7 @@ class Store(ABC):
         pass
 
     @abstractmethod
-    def _item_count(self) -> int:
+    def _next_ref(self, uid: str) -> Fact:
         pass
 
     @abstractmethod

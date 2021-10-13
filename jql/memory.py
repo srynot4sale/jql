@@ -12,6 +12,7 @@ class MemoryStore(Store):
 
         self._changesets: List[ChangeSet] = []
         self._items: Dict[str, Item] = {}
+        self._reflist: Dict[str, str] = {}
 
     def _get_item(self, ref: Fact) -> Optional[Item]:
         return self._items.get(ref.value, None)
@@ -62,8 +63,12 @@ class MemoryStore(Store):
 
         return [Item(facts={Tag(t)}) for t in tags]
 
-    def _item_count(self) -> int:
-        return len(self._items.keys())
+    def _next_ref(self, uid: str) -> Fact:
+        new_ref = self.id_to_ref(len(self._items.keys()))
+        if self._get_item(new_ref):
+            raise Exception(f"{new_ref} item should not already exist")
+        self._reflist[uid] = new_ref.value
+        return new_ref
 
     def _record_changeset(self, changeset: ChangeSet) -> int:
         self._changesets.append(changeset)

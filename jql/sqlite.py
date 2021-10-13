@@ -2,7 +2,6 @@ import datetime
 import json
 import sqlite3
 from typing import FrozenSet, List, Iterable, Set, Optional
-import uuid
 
 
 from jql.changeset import Change, ChangeSet
@@ -17,10 +16,8 @@ class SqliteStore(Store):
         cur = self._conn.cursor()
         cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", ["config"])
         if not cur.fetchone():
-            cur.execute('''CREATE TABLE config
-                        (key text, val text)''')
-            cur.execute('''CREATE TABLE reflist
-                        (ref text)''')
+            cur.execute('''CREATE TABLE config (key text, val text)''')
+            cur.execute('''CREATE TABLE reflist (ref text, uuid text)''')
             cur.execute('''CREATE TABLE facts
                         (changeset int, ref text, tag text, prop text, val text)''')
             # cur.execute('''CREATE TABLE archived
@@ -31,7 +28,7 @@ class SqliteStore(Store):
             cur.execute('''CREATE TABLE changesets
                         (client text, created timestamp, query text)''')
             cur.execute('''CREATE TABLE changes
-                        (changeset int, ref text, facts text, revoke int)''')
+                        (changeset int, ref text, uuid text, facts text, revoke int)''')
 
         # Look for existing salt
         cur.execute("SELECT val FROM config WHERE key='salt'")
@@ -46,21 +43,24 @@ class SqliteStore(Store):
 
         self._conn.commit()
 
-    def _item_count(self) -> int:
+    def _next_ref(self, uid: str) -> Fact:
         cur = self._conn.cursor()
-        cur.execute('INSERT INTO reflist (ref) VALUES (?)', [str(uuid.uuid4())])
-        itemid = int(cur.lastrowid)
-        self._conn.commit()
-        return itemid
 
-    def next_ref(self) -> Fact:
-        new_ref = super().next_ref()
+        cur.execute('INSERT INTO reflist (uuid) VALUES (?)', [uid])
+        itemid = int(cur.lastrowid)
+
+        new_ref = self.id_to_ref(itemid)
+        if self._get_item(new_ref):
+            raise Exception(f"{new_ref} item should not already exist")
+
+        if itemid != self.ref_to_id(new_ref):
+            raise Exception("Ref and ID do not match")
 
         # Update row in reflist with generated hash
-        cur = self._conn.cursor()
-        cur.execute('UPDATE reflist SET ref = ? WHERE rowid = ?', (new_ref.value, self.ref_to_id(new_ref)))
+        cur.execute('UPDATE reflist SET ref = ? WHERE rowid = ? AND uuid = ?', (new_ref.value, itemid, uid))
         if cur.rowcount != 1:
             raise Exception(f"Unexpected result when storing new reference value '{new_ref.value}'")
+
         self._conn.commit()
         return new_ref
 
@@ -171,8 +171,9 @@ class SqliteStore(Store):
 
         for c in changeset.changes:
             ref = c.ref.value if c.ref else ''
+            uid = c.uid if c.uid else ''
             facts = json.dumps([dict(f) for f in c.facts])
-            cur.execute('INSERT INTO changes (changeset, ref, facts, revoke) VALUES (?, ?, ?, ?)', (changeset_id, ref, facts, c.revoke))
+            cur.execute('INSERT INTO changes (changeset, ref, uuid, facts, revoke) VALUES (?, ?, ?, ?, ?)', (changeset_id, ref, uid, facts, c.revoke))
 
         self._conn.commit()
 
@@ -192,13 +193,15 @@ class SqliteStore(Store):
             changes=[]
         )
 
-        for c in cur.execute('SELECT rowid, ref, revoke, facts FROM changes WHERE changeset = ?', (changeset_id, )):
+        for c in cur.execute('SELECT rowid, ref, uuid, revoke, facts FROM changes WHERE changeset = ?', (changeset_id, )):
             ref = Ref(c[1]) if c[1] else None
-            revoke = c[2]
-            facts = set([fact_from_dict(fact) for fact in json.loads(c[3])])
+            uid = c[2] if c[2] else None
+            revoke = c[3]
+            facts = set([fact_from_dict(fact) for fact in json.loads(c[4])])
 
             change = Change(
                 ref=ref,
+                uid=uid,
                 facts=facts,
                 revoke=revoke
             )

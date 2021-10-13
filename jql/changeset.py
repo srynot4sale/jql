@@ -8,8 +8,9 @@ from jql.types import Fact
 
 @dataclass()
 class Change:
-    ref: Optional[Fact]
     facts: Set[Fact]
+    ref: Optional[Fact] = None
+    uid: Optional[str] = None
     revoke: bool = False
 
 
