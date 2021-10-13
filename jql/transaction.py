@@ -16,7 +16,7 @@ logger = structlog.get_logger()
 
 class Transaction:
     def __init__(self, store: Store):
-        self.created = datetime.datetime.now()
+        self.created: Optional[datetime.datetime] = None
         self._store = store
 
         self.query: str = ''
@@ -28,12 +28,22 @@ class Transaction:
     def __repr__(self) -> str:
         return f"Transaction({self.query})"
 
+    def add_response(self, response: List[Item]) -> None:
+        self.log.msg(response)
+        self.response.extend(response)
+
     def commit(self) -> None:
         self.log.msg("tx.commit()")
         if self.changeset:
             cid = self._store.record_changeset(self.changeset)
-            self.response = self._store.apply_changeset(cid)
+            self.add_response(self._store.apply_changeset(cid))
             self.closed = True
+
+    def start(self) -> None:
+        if self.is_closed():
+            raise Exception("Transaction already completed")
+        if not self.created:
+            self.created = datetime.datetime.now()
 
     def is_closed(self) -> bool:
         return self.closed is True
@@ -41,32 +51,38 @@ class Transaction:
     def create_item(self, facts: Iterable[Fact]) -> None:
         if not facts:
             raise Exception("No data supplied")
-
+        self.start()
         self.log.msg("tx.create_item()", facts=facts)
         self._add_change(Change(ref=None, facts=set(facts)))
 
     def update_item(self, ref: Fact, facts: Iterable[Fact]) -> None:
         if not facts:
             raise Exception("No data supplied")
-
+        self.start()
         self.log.msg("tx.update_item()", ref=ref, facts=facts)
         self._add_change(Change(ref=ref, facts=set(facts)))
 
     def get_item(self, ref: Fact) -> None:
+        self.start()
         self.log.msg("tx.get_item()", ref=ref)
-        self.response.append(self._get_item(ref))
+        self.add_response([self._get_item(ref)])
 
     def get_items(self, search: Iterable[Fact]) -> None:
         if not search:
             raise Exception("No search criteria supplied")
+        self.start()
         self.log.msg("tx.get_items()", search=search)
-        self.response.extend(self._get_items(search))
+        self.add_response(self._get_items(search))
 
     def get_hints(self, search: str = '') -> None:
+        self.start()
         # log.msg("tx.get_hints()", search=search)
-        self.response.extend(self._store.get_hints(search))
+        self.add_response(self._store.get_hints(search))
 
     def _add_change(self, change: Change) -> None:
+        if not self.created:
+            raise Exception("Transaction not started")
+
         if not self.changeset:
             self.changeset = ChangeSet(
                 client='',
@@ -89,8 +105,7 @@ class Transaction:
         return self._store.get_items(search)
 
     def q(self, query: str) -> List[Item]:
-        if self.is_closed():
-            raise Exception("Transaction already completed")
+        self.start()
 
         self.query = query
         self.log.msg(f"Query '{query}'")

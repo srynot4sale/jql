@@ -1,7 +1,10 @@
+from jql.types import Item, Tag
+
+
 def test_hints(db) -> None:
-    tag_do = {"do": {}}
-    tag_todo = {"todo": {}}
-    tag_tomorrow = {"tomorrow": {}}
+    tag_do = Item(facts={Tag("do")})
+    tag_todo = Item(facts={Tag("todo")})
+    tag_tomorrow = Item(facts={Tag("tomorrow")})
 
     with db.tx() as tx:
         tx.q("HINTS #do")

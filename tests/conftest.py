@@ -25,11 +25,19 @@ class dbclass:
     def tx(self) -> Generator:  # type: ignore
         self._tx = self.client.new_transaction()
         yield self._tx
-        self._last_resp = self.resp
+        self._last_resp = self._tx.response
+        del self._tx
+
+    def q(self, query: str) -> List[Item]:
+        with self.tx() as tx:
+            return tx.q(query)  # type: ignore
 
     @property
     def resp(self) -> List[Item]:
-        return self._tx.response
+        if hasattr(self, '_tx') and self._tx.created:
+            return self._tx.response
+        else:
+            return self._last_resp
 
     @property
     def single(self) -> Item:
@@ -38,21 +46,14 @@ class dbclass:
 
     @property
     def last_ref(self) -> Fact:
-        if hasattr(self, '_tx') and len(self._tx.response):
-            res = self._tx.response
-        else:
-            res = self._last_resp
-
-        assert len(res) == 1
-
         # Return a copy of the ref
-        return Ref(res[0].ref.value)
+        return Ref(self.single.ref.value)
 
     def assert_result(self, comparison) -> None:  # type: ignore
-        if not isinstance(comparison, List):
+        if isinstance(comparison, Item):
             comparison = [comparison]
-
-        assert self.resp == comparison
+        assert len(self.resp) == len(comparison)
+        assert [r.as_tuples() for r in self.resp] == [r.as_tuples() for r in comparison]
 
 
 @pytest.fixture

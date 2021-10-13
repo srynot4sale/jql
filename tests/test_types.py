@@ -48,15 +48,17 @@ def test_flags() -> None:
     assert get_flags(k) == set({Flag("help", "me"), Flag("test", "passed"), Flag("lost", "bet")})
 
 
-def test_dicts() -> None:
+def test_tuples() -> None:
     i = Item({Ref("23"), Flag("test", "passed"), Content("here")})
-    assert i == {"test": {"passed": ""}, "db": {"content": "here"}}
+    assert i.as_tuples() == {("test", "passed", ""), ("db", "content", "here")}
 
     j = Item({Tag("help"), Flag("test", "passed"), Content("here")})
-    assert j == {"help": {}, "test": {"passed": ""}, "db": {"content": "here"}}
+    assert j.as_tuples() == {("help", "", ""), ("test", "passed", ""), ("db", "content", "here")}
 
     k = Item({Tag("help"), Tag("me"), Flag("test", "passed"), Value("lost", "bet", "twice"), Content("here")})
-    assert k == {"help": {}, "me": {}, "test": {"passed": ""}, "lost": {"bet": "twice"}, "db": {"content": "here"}}
+    assert k.as_tuples() == {("help", "", ""), ("me", "", ""), ("test", "passed", ""), ("lost", "bet", "twice"), ("db", "content", "here")}
 
     m = Item({Tag("help"), Tag("me"), Flag("test", "passed"), Value("test", "failed", "twice"), Content("here")})
-    assert m == {"help": {}, "me": {}, "test": {"passed": "", "failed": "twice"}, "db": {"content": "here"}}
+    assert m.as_tuples() == {("help", "", ""), ("me", "", ""), ("test", "passed", ""), ("test", "failed", "twice"), ("db", "content", "here")}
+
+    # andback

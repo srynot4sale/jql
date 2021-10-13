@@ -1,6 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import Callable, Dict, Set, Iterable, Generator
+from typing import Callable, Set, Iterable, Generator
 
 
 @dataclass(frozen=True)
@@ -41,6 +41,9 @@ class Fact:
             yield 'prop', self.prop
         if len(self.value):
             yield 'value', self.value
+
+    def as_tuple(self) -> tuple[str, str, str]:
+        return (self.tag, self.prop, self.value)
 
 
 def tag_eq(tag: str) -> Callable[[Fact], bool]:
@@ -159,21 +162,8 @@ class Item:
 
         return ' '.join(output)
 
-    def __dict__(self) -> Dict[str, Dict[str, str]]:  # type: ignore
-        i: Dict[str, Dict[str, str]] = {}
-        for t in get_tags(self):
-            i[t.tag] = {}
-        if str(self.content):
-            i["db"] = {"content": str(self.content)}
-        for f in get_props(self):
-            i[f.tag][f.prop] = f.value
-        return i
-
-    def __eq__(self, comparison) -> bool:  # type: ignore
-        if isinstance(comparison, Dict):
-            return self.__dict__() == comparison
-        else:
-            return super().__eq__(comparison)
+    def as_tuples(self) -> set[tuple[str, str, str]]:
+        return {f.as_tuple() for f in self.facts if not is_primary_ref(f)}
 
     @property
     def __iter__(self):  # type: ignore
