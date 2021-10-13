@@ -93,12 +93,12 @@ class Transaction:
             raise Exception("Transaction already completed")
 
         self.query = query
+        self.log.msg(f"Query '{query}'")
         self.log = self.log.bind(query=query)
         tree = jql_parser.parse(query)
         ast = JqlTransformer().transform(tree)
         action = ast.data
         values: List[Fact] = [c for c in ast.children if isinstance(c, Fact)]  # type: ignore
-        # log.msg(f"Query '{query}' AST", ast=ast.children)
 
         if action == 'create':
             self.create_item(values)
