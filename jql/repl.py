@@ -1,9 +1,11 @@
 import logging
-from prompt_toolkit import PromptSession, HTML, print_formatted_text as print
+from prompt_toolkit import PromptSession, print_formatted_text as print
 from prompt_toolkit.completion import Completer, Completion
 from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
+from prompt_toolkit.formatted_text.html import HTML, html_escape as e
 import re
 import structlog
+import sys
 from typing import List, Optional, Tuple
 
 
@@ -63,7 +65,7 @@ def render_item(item: Item, shortcut: Optional[int] = None) -> HTML:
     if has_ref(item):
         output += f' <skyblue><b>{item.ref}</b></skyblue>'
 
-    output += f' {item.content}'
+    output += f' {e(item.content)}'
 
     for p in get_tags(item):
         output += f' <green>#{p.tag}</green>'
@@ -72,7 +74,7 @@ def render_item(item: Item, shortcut: Optional[int] = None) -> HTML:
         output += f' <green>#{p.tag}</green>'
         output += f'/<orange>{p.prop}</orange>'
         if has_value(p):
-            output += f'=<yellow>{p.value}</yellow>'
+            output += f'=<yellow>{e(p.value)}</yellow>'
 
     return HTML(output)
 
