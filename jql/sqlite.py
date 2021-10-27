@@ -6,7 +6,7 @@ from typing import FrozenSet, List, Iterable, Set, Optional
 
 from jql.changeset import Change, ChangeSet
 from jql.db import Store
-from jql.types import Fact, Item, Ref, is_tag, is_flag, is_content, is_ref, has_value, Tag, fact_from_dict
+from jql.types import Fact, Item, Ref, is_tag, is_flag, is_content, has_value, Tag, fact_from_dict
 
 
 class SqliteStore(Store):
@@ -95,11 +95,13 @@ class SqliteStore(Store):
                 # Content is a caseless substr match
                 w = f"{prefix}.tag = 'db' AND {prefix}.prop = 'content' AND {prefix}.val LIKE ?"
                 d.append(f'%{fact.value}%')
-            elif not is_ref(fact) and has_value(fact):
+            elif has_value(fact):
                 w = f"{prefix}.tag = ? AND {prefix}.prop = ? AND {prefix}.val = ?"
                 d.append(fact.tag)
                 d.append(fact.prop)
                 d.append(fact.value)
+            else:
+                raise Exception(f'Unexpected search token {fact}')
 
             where.append(f" INNER JOIN facts AS {prefix} ON r.ref = {prefix}.ref AND {w} ")
 
