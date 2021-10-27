@@ -12,7 +12,11 @@ from jql.sqlite import SqliteStore
 from jql.types import Item, get_props, get_tags, has_ref, has_value
 
 
-store_path = "./repl.db"
+if len(sys.argv) > 1:
+    store_path = sys.argv[1]
+else:
+    store_path = "./repl.db"
+
 store = SqliteStore(location=store_path)
 client = Client(store=store, client="repl:user", log_level=logging.ERROR)
 
@@ -23,7 +27,7 @@ log = structlog.get_logger()
 print('Welcome to JQL')
 print('q to quit, h for help')
 
-print(f"Logged in as {client.user}, with client {client.name}")
+print(f"Logged in to '{store_path}' as {client.user}, with client {client.name}")
 
 
 class JqlCompleter(Completer):
