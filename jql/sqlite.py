@@ -142,9 +142,11 @@ class SqliteStore(Store):
         return updated_item
 
     def _add_facts(self, ref: Fact, facts: FrozenSet[Fact]) -> None:
-        cur = self._conn.cursor()
+        values = []
         for f in facts:
-            cur.execute('INSERT INTO facts (ref, tag, prop, val) VALUES (?, ?, ?, ?)', (ref.value, f.tag, f.prop, f.value))
+            values.append((ref.value, f.tag, f.prop, f.value))
+        cur = self._conn.cursor()
+        cur.executemany('INSERT INTO facts (ref, tag, prop, val) VALUES (?, ?, ?, ?)', values)
         self._conn.commit()
 
     def _get_tags_as_items(self, prefix: str = '') -> List[Item]:
@@ -171,12 +173,14 @@ class SqliteStore(Store):
         cur.execute('INSERT INTO changesets (client, created, query) VALUES (?, ?, ?)', (changeset.client, changeset.created, changeset.query))
         changeset_id = int(cur.lastrowid)
 
+        values = []
         for c in changeset.changes:
             ref = c.ref.value if c.ref else ''
             uid = c.uid if c.uid else ''
             facts = json.dumps([dict(f) for f in c.facts])
-            cur.execute('INSERT INTO changes (changeset, ref, uuid, facts, revoke) VALUES (?, ?, ?, ?, ?)', (changeset_id, ref, uid, facts, c.revoke))
+            values.append((changeset_id, ref, uid, facts, c.revoke))
 
+        cur.executemany('INSERT INTO changes (changeset, ref, uuid, facts, revoke) VALUES (?, ?, ?, ?, ?)', values)
         self._conn.commit()
 
         return changeset_id
