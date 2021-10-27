@@ -124,5 +124,5 @@ while True:
     except EOFError:
         print('Quitting')
         break
-    except BaseException:
-        log.exception("Error occured")
+    except BaseException as ex:
+        log.exception("Error occured", exception=ex)
