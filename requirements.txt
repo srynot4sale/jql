@@ -1,5 +1,4 @@
 lark
-neo4j
 structlog
 colorama
 hashids
