@@ -1,12 +1,12 @@
 import datetime
 import json
 import sqlite3
-from typing import FrozenSet, List, Iterable, Set, Optional
+from typing import FrozenSet, List, Iterable, Set, Optional, Tuple
 
 
 from jql.changeset import Change, ChangeSet
 from jql.db import Store
-from jql.types import Fact, Item, Ref, is_tag, is_flag, is_content, has_value, Tag, fact_from_dict
+from jql.types import Fact, Flag, Item, Ref, Value, is_tag, is_flag, is_content, has_value, Tag, fact_from_dict
 
 
 class SqliteStore(Store):
@@ -150,23 +150,42 @@ class SqliteStore(Store):
         self._conn.commit()
 
     def _get_tags_as_items(self, prefix: str = '') -> List[Item]:
-        tags: List[str] = []
+        tags: List[Tuple[str, str]] = []
 
         cur = self._conn.cursor()
         tags_sql = '''
-            SELECT DISTINCT tag
+            SELECT tag, COUNT(DISTINCT ref)
             FROM facts
+            GROUP BY tag
             ORDER BY tag
         '''
 
         for row in cur.execute(tags_sql):
             if row[0] == 'db':
                 continue
-            if row[0] not in tags:
-                if row[0].startswith(prefix):
-                    tags.append(row[0])
+            if row[0].startswith(prefix):
+                tags.append((row[0], str(row[1])))
 
-        return [Item(facts={Tag(t)}) for t in tags]
+        return [Item(facts={Tag(t[0]), Value('db', 'count', t[1])}) for t in tags]
+
+    def _get_props_as_items(self, prefix: str = '') -> List[Item]:
+        tags: List[Tuple[str, str, str]] = []
+
+        cur = self._conn.cursor()
+        tags_sql = '''
+            SELECT tag, prop, COUNT(DISTINCT ref)
+            FROM facts
+            GROUP BY tag, prop
+            ORDER BY tag, prop
+        '''
+
+        for row in cur.execute(tags_sql):
+            if row[0] == 'db':
+                continue
+            if f'{row[0]}/{row[1]}'.startswith(prefix):
+                tags.append((row[0], row[1], str(row[2])))
+
+        return [Item(facts={Flag(t[0], t[1]), Value('db', 'count', t[2])}) for t in tags]
 
     def _record_changeset(self, changeset: ChangeSet) -> int:
         cur = self._conn.cursor()
