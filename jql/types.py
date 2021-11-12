@@ -166,7 +166,7 @@ class Item:
         if has_ref(self):
             output.append(str(self.ref))
 
-        if self.content:
+        if self.content and len(self.content.value):
             output.append(str(self.content))
 
         output.extend([str(d) for d in get_tags(self)])
