@@ -1,0 +1,43 @@
+{% extends "layout.html" %}
+
+{% block subnav %}
+{% set ns = namespace(nonempty=false) %}
+{% for prop, count in props if count != full_count %}
+    {% if not ns.nonempty %}
+    <ul>
+    {% endif %}
+    {% set ns.nonempty = true %}
+        <li>{{ make_link(prop)|safe }} ({{ count }})</li>
+{% endfor %}
+{% if ns.nonempty %}
+    </ul>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+
+<ol>
+    {% set page = items if items|length < 100 else items[0:100] %}
+    {% for i in page %}
+    <li>
+        <div class="item">
+            <ul class="tags">
+                {% for t in get_tags(i) if t not in context and t != primary_tag %}
+                <li>{{ make_link(t)|safe }}</li>
+                {% endfor %}
+            </ul>
+            <h3>
+                {{ make_link(i.ref)|safe }}
+                {{ i.content }}
+            </h3>
+            <ul class="facts">
+                {% for p in get_props(i) if p.prop != 'id' %}
+                <li><strong>{{ p.tag }}/{{ p.prop }}</strong> {{ p.value|urlize }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </li>
+    {% endfor %}
+</ol>
+
+{% endblock %}

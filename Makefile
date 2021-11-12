@@ -38,3 +38,6 @@ lint: ## Lint code
 repl: ## Run REPL
 	venv/bin/python -m jql.repl
 
+.PHONY: web
+web: ## Run web server
+	FLASK_APP=jql.web FLASK_ENV=development venv/bin/python -m flask run --port 8787 --host 0.0.0.0

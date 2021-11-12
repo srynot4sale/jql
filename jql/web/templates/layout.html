@@ -1,0 +1,151 @@
+<!doctype html>
+<html class="no-js" lang="">
+
+<head>
+  <meta charset="utf-8">
+  <title>JQL</title>
+  <meta name="description" content="">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <meta property="og:title" content="">
+  <meta property="og:type" content="">
+  <meta property="og:url" content="">
+  <meta property="og:image" content="">
+
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+
+  <link rel="apple-touch-icon" href="icon.png">
+  <!-- Place favicon.ico in the root directory -->
+
+  <meta name="theme-color" content="#fafafa">
+
+  <style>
+
+    html, body {
+        margin: 0;
+        padding: 0;
+    }
+
+    header {
+        background-color: #efefef;
+        padding: 20px;
+        margin-bottom: 25px;
+    }
+
+    header h1 {
+        margin: 0;
+        padding: 0;
+    }
+
+    header form#search {
+        float: right;
+    }
+
+    header form#search input {
+        padding: 5px;
+        font-size: 125%;
+    }
+
+    aside {
+        float: left;
+        width: 20%;
+    }
+
+    aside nav ul {
+        margin-top: 0;
+    }
+
+    section {
+        margin-left: 25%;
+    }
+
+    section ol {
+        list-style: none;
+    }
+
+    div.item {
+        padding-bottom: 0.5em;
+    }
+
+    div.item h3 {
+        font-size: 100%;
+        font-weight: normal;
+        margin-bottom: 0.5em;
+    }
+
+    div.item ul li {
+        list-style: none;
+        display: inline-block;
+        margin-right: 20px;
+        font-size: 80%;
+    }
+
+    div.item ul.tags {
+        float: right;
+    }
+
+    div.item ul.tags li a {
+        display: inline-block;
+        padding: 5px;
+        background-color: #ececec;
+    }
+
+    div.item ul.props li {
+        display: inline-block;
+        padding: 5px;
+    }
+
+    div.item ul.props li strong {
+        background-color: #fdfdfd;
+    }
+
+    table.props {
+        border-collapse: collapse;
+    }
+
+    table.props td, table.props th {
+        border: 1px solid #ccc;
+        padding: 5px;
+    }
+
+    table.props tbody th {
+        text-align: left;
+        background-color: #fdfdfd;
+        font-weight: bold;
+    }
+
+  </style>
+
+</head>
+
+<body>
+    <header>
+        <form id="search" method="GET" action="/results/">
+            <input type="text" name="q" />
+            <input type="submit" value="Query" />
+        </form>
+        <h1>{{ title }}</h1>
+    </header>
+
+    <main>
+        <aside>
+            <nav>
+                {% block subnav %}{% endblock %}
+                <ul>
+                    <li><a href="/"><strong>{{ primary_tag }}</strong></a></li>
+                    {% for tag, count in tags %}
+                    <li>{{ make_link(tag)|safe }} ({{ count }})</li>
+                    {% endfor %}
+                </ul>
+            </nav>
+        </aside>
+
+        <section>
+            {% block content %}{% endblock %}
+        </section>
+    </main>
+
+</body>
+
+</html>

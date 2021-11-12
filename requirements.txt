@@ -3,3 +3,4 @@ structlog
 colorama
 hashids
 prompt_toolkit
+flask

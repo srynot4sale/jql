@@ -1,0 +1,22 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<h2>{{ item.content }}</h2>
+
+<table class="props">
+    <tbody>
+        {% for t in item_tags %}
+        <tr>
+            <th colspan="2">{{ t.tag }}</th>
+        </tr>
+        {% for i in item.facts if i.tag == t.tag and i.prop %}
+        <tr>
+            <td>{{ i.prop }}</td>
+            <td>{{ i.value|urlize }}</td>
+        </tr>
+        {% endfor %}
+        {% endfor %}
+    </tbody>
+</table>
+
+{% endblock %}
