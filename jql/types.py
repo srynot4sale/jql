@@ -35,6 +35,9 @@ class Fact:
             else:
                 return f"Value(tag='{self.tag}', prop='{self.prop}', value='{self.value}')"
 
+    def __len__(self) -> int:
+        return len(self.tag) + len(self.prop) + len(self.value)
+
     def __iter__(self) -> Generator:  # type: ignore
         yield 'tag', self.tag
         if len(self.prop):
@@ -140,14 +143,23 @@ class Item:
 
     @property
     def ref(self) -> Fact:
-        for f in filter(is_primary_ref, self.facts):
-            return f
-        else:
+        f = list(filter(is_primary_ref, self.facts))
+        if len(f) == 1:
+            return f[0]
+        elif len(f) == 0:
             raise Exception("No ref")
+        else:
+            raise Exception("Multiple primary refs found")
 
     @property
     def content(self) -> Fact:
-        return next(filter(is_content, self.facts), Content(""))
+        c = list(filter(is_content, self.facts))
+        if len(c) == 1:
+            return c[0]
+        elif len(c) == 0:
+            return Content("")
+        else:
+            raise Exception("Multiple content facts found")
 
     def __str__(self) -> str:
         output: list[str] = []
@@ -170,16 +182,24 @@ class Item:
         return self.facts.__iter__
 
 
+def get_facts(item: Item) -> Set[Fact]:
+    return {f for f in item.facts if not has_sys_tag(f)}
+
+
 def get_tags(item: Item) -> Set[Fact]:
-    return {Tag(f.tag) for f in item.facts if not has_sys_tag(f)}
+    return {Tag(f.tag) for f in get_facts(item)}
 
 
 def get_props(item: Item) -> Set[Fact]:
-    return {f for f in item.facts if is_prop(f) and not has_sys_tag(f)}
+    return {f for f in get_facts(item) if is_prop(f)}
 
 
 def get_flags(item: Item) -> Set[Fact]:
     return {Flag(f.tag, f.prop) for f in get_props(item)}
+
+
+def get_value(item: Item, tag: str, prop: str) -> str:
+    return single((f for f in item.facts if tag_eq(tag)(f) and prop_eq(prop)(f) and has_value(f))).value
 
 
 def update_item(item: Item, add: Iterable[Fact]) -> Item:
@@ -188,3 +208,10 @@ def update_item(item: Item, add: Iterable[Fact]) -> Item:
 
 def has_ref(item: Item) -> bool:
     return next(filter(is_primary_ref, item.facts), None) is not None
+
+
+def single(facts: Iterable[Fact]) -> Fact:
+    f = list(facts)
+    if len(f) != 1:
+        raise Exception(f'Expected a single fact, but got {len(f)}')
+    return f[0]
