@@ -9,6 +9,11 @@ class Fact:
     prop: str
     value: str
 
+    def __post_init__(self) -> None:
+        for a in ('tag', 'prop', 'value'):
+            if not isinstance(getattr(self, a), str):
+                raise ValueError(f"{a.capitalize()} attribute of fact was not a string: {repr(self.as_tuple())}")
+
     def __str__(self) -> str:
         if is_tag(self):
             return f"#{self.tag}"
