@@ -8,13 +8,16 @@ from jql.types import Fact, Ref, Tag, Flag, Value, Content
 jql_parser = Lark(r"""
     action: "CREATE" data+             -> create
           | "CREATE" content data*     -> create
-          | "HINTS" tag*               -> hints
+          | "HINTS" prop*              -> hints
           | match "SET" content        -> set
           | match "SET" data+          -> set
           | id                         -> get
           | data+                      -> list
           | content data*              -> list
           | id "HISTORY"               -> history
+
+    ?prop: tag "/"?
+         | fact
 
     ?data: tag
          | fact

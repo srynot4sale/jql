@@ -135,7 +135,10 @@ class Transaction:
             return self.response
 
         if action == 'hints':
-            self.get_hints(values[0].tag if values else '')
+            search = str(values[0]) if values else ''
+            if search and self.query.endswith('/'):
+                search += '/'
+            self.get_hints(search)
             return self.response
 
         raise Exception(f"Unknown query '{query}'")

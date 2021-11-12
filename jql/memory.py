@@ -3,7 +3,7 @@ from typing import Dict, List, Iterable, Set, Optional
 
 from jql.changeset import ChangeSet
 from jql.db import Store
-from jql.types import Fact, Item, is_content, is_tag, is_flag, is_ref, has_value, get_tags, get_props, get_flags, Tag, update_item
+from jql.types import Fact, Flag, Item, is_content, is_tag, is_flag, is_ref, has_value, get_tags, get_props, get_flags, Tag, update_item, Value
 
 
 class MemoryStore(Store):
@@ -53,15 +53,34 @@ class MemoryStore(Store):
         return updated_item
 
     def _get_tags_as_items(self, prefix: str = '') -> List[Item]:
-        tags: List[str] = []
+        tags: Dict[str, int] = {}
         for _, item in self._items.items():
-            for t in get_tags(item):
-                if t.tag in tags:
+            itags = get_tags(item)
+            itags.add(Tag('db'))
+            for t in itags:
+                if not t.tag.startswith(prefix):
                     continue
-                if t.tag.startswith(prefix):
-                    tags.append(t.tag)
+                if t.tag not in tags:
+                    tags[t.tag] = 0
+                tags[t.tag] += 1
 
-        return [Item(facts={Tag(t)}) for t in tags]
+        return [Item(facts={Tag(t), Value('db', 'count', str(tags[t]))}) for t in tags.keys()]
+
+    def _get_props_as_items(self, tag: str, prefix: str = '') -> List[Item]:
+        tags: Dict[str, int] = {}
+        for _, item in self._items.items():
+            for f in item.facts:
+                if f.tag != tag:
+                    continue
+                if f.prop == "" and prefix == "":
+                    continue
+                if not f.prop.startswith(prefix):
+                    continue
+                if f.prop not in tags:
+                    tags[f.prop] = 0
+                tags[f.prop] += 1
+
+        return [Item(facts={Flag(tag, t), Value('db', 'count', str(tags[t]))}) for t in tags.keys()]
 
     def _next_ref(self, uid: str) -> Fact:
         new_ref = self.id_to_ref(len(self._items.keys()))

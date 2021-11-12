@@ -24,7 +24,11 @@ class Store(ABC):
         return self._get_items(search)
 
     def get_hints(self, search: str = "") -> List[Item]:
-        return self._get_tags_as_items(search)
+        search_terms = search.lstrip('#').split('/', 1)
+        if len(search_terms) > 1:
+            return self._get_props_as_items(search_terms[0], search_terms[1])
+        else:
+            return self._get_tags_as_items(search_terms[0])
 
     def record_changeset(self, changeset: ChangeSet) -> int:
         return self._record_changeset(changeset)
@@ -56,6 +60,10 @@ class Store(ABC):
 
     @abstractmethod
     def _get_tags_as_items(self, prefix: str = '') -> List[Item]:
+        pass
+
+    @abstractmethod
+    def _get_props_as_items(self, tag: str, prefix: str = '') -> List[Item]:
         pass
 
     @abstractmethod

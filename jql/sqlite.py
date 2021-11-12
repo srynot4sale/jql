@@ -150,7 +150,7 @@ class SqliteStore(Store):
         self._conn.commit()
 
     def _get_tags_as_items(self, prefix: str = '') -> List[Item]:
-        tags: List[Tuple[str, str]] = []
+        tags: List[Tuple[Fact, str]] = []
 
         cur = self._conn.cursor()
         tags_sql = '''
@@ -161,31 +161,30 @@ class SqliteStore(Store):
         '''
 
         for row in cur.execute(tags_sql):
-            if row[0] == 'db':
-                continue
             if row[0].startswith(prefix):
-                tags.append((row[0], str(row[1])))
+                tags.append((Tag(row[0]), str(row[1])))
 
-        return [Item(facts={Tag(t[0]), Value('db', 'count', t[1])}) for t in tags]
+        return [Item(facts={t[0], Value('db', 'count', t[1])}) for t in tags]
 
-    def _get_props_as_items(self, prefix: str = '') -> List[Item]:
-        tags: List[Tuple[str, str, str]] = []
+    def _get_props_as_items(self, tag: str, prefix: str = '') -> List[Item]:
+        tags: List[Tuple[Fact, str]] = []
 
         cur = self._conn.cursor()
         tags_sql = '''
-            SELECT tag, prop, COUNT(DISTINCT ref)
+            SELECT prop, COUNT(DISTINCT ref)
             FROM facts
-            GROUP BY tag, prop
-            ORDER BY tag, prop
+            WHERE tag = ?
+            GROUP BY prop
+            ORDER BY prop
         '''
 
-        for row in cur.execute(tags_sql):
-            if row[0] == 'db':
+        for row in cur.execute(tags_sql, [tag]):
+            if row[0] == "" and prefix == "":
                 continue
-            if f'{row[0]}/{row[1]}'.startswith(prefix):
-                tags.append((row[0], row[1], str(row[2])))
+            if row[0].startswith(prefix):
+                tags.append((Flag(tag, row[0]), str(row[1])))
 
-        return [Item(facts={Flag(t[0], t[1]), Value('db', 'count', t[2])}) for t in tags]
+        return [Item(facts={t[0], Value('db', 'count', t[1])}) for t in tags]
 
     def _record_changeset(self, changeset: ChangeSet) -> int:
         cur = self._conn.cursor()

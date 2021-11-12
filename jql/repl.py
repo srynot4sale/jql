@@ -11,7 +11,7 @@ from typing import List, Optional, Tuple
 
 from jql.client import Client
 from jql.sqlite import SqliteStore
-from jql.types import Item, get_props, get_tags, has_ref, has_value
+from jql.types import Item, get_props, get_tags, has_ref, has_value, get_facts, single
 
 
 if len(sys.argv) > 1:
@@ -42,7 +42,10 @@ class JqlCompleter(Completer):
             tx = client.store.new_transaction()
             response = tx.q(f'HINTS {word}' if len(word) > 1 else 'HINTS')
             for r in response:
-                yield Completion(str(r), start_position=-len(word))
+                # Ignore system tags/facts
+                if not get_tags(r):
+                    continue
+                yield Completion(str(single(get_facts(r))), start_position=-len(word))
         else:
             for ac in self.actions:
                 if ac.startswith(word):
