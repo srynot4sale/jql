@@ -12,10 +12,14 @@ __pycache__/
 *.py[cod]
 *$py.class
 .pytest_cache/
-..mypy_cache/
+.mypy_cache/
+/.stfolder/
+/.stversions/
 
 Dockerfile.test
 docker-compose.test.yml
 Makefile
 /data/
 /logs/
+
+*.jdb

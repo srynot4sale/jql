@@ -17,7 +17,7 @@ from jql.types import Item, get_props, get_tags, has_ref, has_value
 if len(sys.argv) > 1:
     store_path = sys.argv[1]
 else:
-    store_path = "./repl.db"
+    store_path = "./repl.jdb"
 
 store = SqliteStore(location=store_path)
 client = Client(store=store, client="repl:user", log_level=logging.ERROR)

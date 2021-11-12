@@ -12,6 +12,6 @@ __pycache__/
 .stversions/
 .syncthing.*.tmp
 
-/repl.db
+*.jdb
 /data/
 /logs/
