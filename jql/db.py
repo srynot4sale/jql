@@ -43,14 +43,18 @@ class Store(ABC):
         cs_ref, _ = self._next_ref(changeset.uuid, changeset=True)
         content = json.dumps([c.to_dict() for c in changeset.changes])
 
-        cs = Item(facts={
+        facts = {
             cs_ref,
             Flag('db', 'tx'),
             Value('db', 'txclient', changeset.client),
-            Value('db', 'txquery', changeset.query),
             Value('db', 'txcreated', str(changeset.created)),
             Content(content),
-        })
+        }
+
+        if changeset.query:
+            facts.add(Value('db', 'txquery', changeset.query))
+
+        cs = Item(facts=facts)
         self._create_item(cs)
 
         resp: List[Item] = []
