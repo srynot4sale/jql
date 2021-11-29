@@ -10,11 +10,13 @@ from jql.transaction import Transaction
 
 
 class Client:
+    ref: str
     name: str
     user: str
     store: Store
 
     def __init__(self, store: Store, client: str, log_level: int = logging.INFO):
+        self.ref = client
         self.name, self.user = client.split(':')
         self.store = store
 
@@ -37,7 +39,7 @@ class Client:
         )
 
     def new_transaction(self) -> Transaction:
-        return Transaction(self.store)
+        return Transaction(self, self.store)
 
     def read(self, query: str) -> List[Item]:
         return self.new_transaction().q(query)

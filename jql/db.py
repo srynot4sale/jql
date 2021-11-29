@@ -6,7 +6,6 @@ from typing import List, Optional, Iterable, Set, Tuple
 import uuid
 
 
-from jql.transaction import Transaction
 from jql.types import Content, Fact, Flag, Item, is_ref, Ref, Value
 from jql.changeset import ChangeSet
 
@@ -66,9 +65,6 @@ class Store(ABC):
             else:
                 raise Exception("Unexpected Change format")
         return resp
-
-    def new_transaction(self) -> Transaction:
-        return Transaction(self)
 
     def ref_to_id(self, ref: Fact) -> int:
         return int(self._hashstore.decode(ref.value)[0])

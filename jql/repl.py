@@ -39,7 +39,7 @@ class JqlCompleter(Completer):
     def get_completions(self, document, complete_event):  # type: ignore
         word = document.get_word_before_cursor(WORD=False, pattern=self._FIND_WORD_RE)
         if word.startswith('#'):
-            tx = client.store.new_transaction()
+            tx = client.new_transaction()
             response = tx.q(f'HINTS {word}' if len(word) > 1 else 'HINTS')
             for r in response:
                 # Ignore system tags/facts

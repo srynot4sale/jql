@@ -5,6 +5,7 @@ from typing import Iterable, List, Optional, TYPE_CHECKING
 import uuid
 
 if TYPE_CHECKING:
+    from jql.client import Client
     from jql.db import Store
 
 from jql.parser import jql_parser, JqlTransformer
@@ -16,9 +17,10 @@ logger = structlog.get_logger()
 
 
 class Transaction:
-    def __init__(self, store: Store):
+    def __init__(self, client: Client, store: Store):
         self.created: Optional[datetime.datetime] = None
         self._store = store
+        self._client = client
 
         self.query: str = ''
         self.changeset: Optional[ChangeSet] = None
@@ -92,7 +94,7 @@ class Transaction:
         if not self.changeset:
             self.changeset = ChangeSet(
                 uuid=str(uuid.uuid4()),
-                client='',
+                client=self._client.ref,
                 created=self.created,
                 query=self.query,
                 changes=[]
