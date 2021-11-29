@@ -1,12 +1,13 @@
 from abc import ABC, abstractmethod
 from hashids import Hashids  # type: ignore
+import json
 import string
-from typing import List, Optional, Iterable, Set
+from typing import List, Optional, Iterable, Set, Tuple
 import uuid
 
 
 from jql.transaction import Transaction
-from jql.types import Fact, Item, is_ref, Ref
+from jql.types import Content, Fact, Flag, Item, is_ref, Ref, Value
 from jql.changeset import ChangeSet
 
 
@@ -30,11 +31,28 @@ class Store(ABC):
         else:
             return self._get_tags_as_items(search_terms[0])
 
-    def record_changeset(self, changeset: ChangeSet) -> int:
+    def get_changesets(self) -> List[Item]:
+        return self._get_changesets_as_items()
+
+    def record_changeset(self, changeset: ChangeSet) -> str:
         return self._record_changeset(changeset)
 
-    def apply_changeset(self, changeset_id: int) -> List[Item]:
-        changeset = self._load_changeset(changeset_id)
+    def apply_changeset(self, changeset_uuid: str) -> List[Item]:
+        changeset = self._load_changeset(changeset_uuid)
+
+        # Commit changeset
+        cs_ref, _ = self._next_ref(changeset.uuid, changeset=True)
+        content = json.dumps([c.to_dict() for c in changeset.changes])
+
+        cs = Item(facts={
+            cs_ref,
+            Flag('db', 'tx'),
+            Value('db', 'txclient', changeset.client),
+            Value('db', 'txquery', changeset.query),
+            Value('db', 'txcreated', str(changeset.created)),
+            Content(content),
+        })
+        self._create_item(cs)
 
         resp: List[Item] = []
         for change in changeset.changes:
@@ -42,7 +60,7 @@ class Store(ABC):
             if change.ref:
                 resp.append(self._update_item(change.ref, change.facts))
             elif change.uid:
-                new_ref = self._next_ref(change.uid)
+                new_ref, _ = self._next_ref(change.uid)
                 new_item = Item(facts=frozenset(change.facts.union({new_ref})))
                 resp.append(self._create_item(new_item))
             else:
@@ -83,13 +101,17 @@ class Store(ABC):
         pass
 
     @abstractmethod
-    def _next_ref(self, uid: str) -> Fact:
+    def _next_ref(self, uid: str, changeset: bool = False) -> Tuple[Fact, int]:
         pass
 
     @abstractmethod
-    def _record_changeset(self, changeset: ChangeSet) -> int:
+    def _record_changeset(self, changeset: ChangeSet) -> str:
         pass
 
     @abstractmethod
-    def _load_changeset(self, changeset_id: int) -> ChangeSet:
+    def _load_changeset(self, changeset_uuid: str) -> ChangeSet:
+        pass
+
+    @abstractmethod
+    def _get_changesets_as_items(self) -> List[Item]:
         pass

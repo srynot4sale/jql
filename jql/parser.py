@@ -9,6 +9,7 @@ jql_parser = Lark(r"""
     action: "CREATE" data+             -> create
           | "CREATE" content data*     -> create
           | "HINTS" prop*              -> hints
+          | "CHANGESETS"               -> changesets
           | match "SET" content        -> set
           | match "SET" data+          -> set
           | id                         -> get

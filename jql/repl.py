@@ -11,7 +11,7 @@ from typing import List, Optional, Tuple
 
 from jql.client import Client
 from jql.sqlite import SqliteStore
-from jql.types import Item, get_props, get_tags, has_ref, has_value, get_facts, single
+from jql.types import Item, get_props, get_tags, has_ref, has_sys_tag, has_value, get_facts, single
 
 
 if len(sys.argv) > 1:
@@ -33,7 +33,7 @@ print(f"Logged in to '{store_path}' as {client.user}, with client {client.name}"
 
 
 class JqlCompleter(Completer):
-    actions = ["CREATE", "SET", "GET", "HINTS", "HISTORY", "LIST", "QUIT"]
+    actions = ["CREATE", "SET", "GET", "HINTS", "HISTORY", "LIST", "QUIT", "CHANGESETS"]
     _FIND_WORD_RE = re.compile(r"([a-zA-Z0-9_@#=\/]+)")
 
     def get_completions(self, document, complete_event):  # type: ignore
@@ -45,7 +45,9 @@ class JqlCompleter(Completer):
                 # Ignore system tags/facts
                 if not get_tags(r):
                     continue
-                yield Completion(str(single(get_facts(r))), start_position=-len(word))
+                # Get non db/count fact
+                c = single({f for f in get_facts(r) if not has_sys_tag(f)})
+                yield Completion(str(c), start_position=-len(word))
         else:
             for ac in self.actions:
                 if ac.startswith(word):

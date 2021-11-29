@@ -1,4 +1,4 @@
-from typing import Dict, List, Iterable, Set, Optional
+from typing import Dict, List, Iterable, Set, Optional, Tuple
 
 
 from jql.changeset import ChangeSet
@@ -10,9 +10,9 @@ class MemoryStore(Store):
     def __init__(self, salt: str = "") -> None:
         super().__init__(salt)
 
-        self._changesets: List[ChangeSet] = []
+        self._changesets: Dict[str, ChangeSet] = {}
         self._items: Dict[str, Item] = {}
-        self._reflist: Dict[str, str] = {}
+        self._reflist: Dict[int, Tuple[str, str]] = {}
 
     def _get_item(self, ref: Fact) -> Optional[Item]:
         return self._items.get(ref.value, None)
@@ -21,6 +21,9 @@ class MemoryStore(Store):
         matches = []
         # Loop through every item
         for _, item in self._items.items():
+            if item.is_tx():
+                continue
+
             match = True
             # For each item, loop through each search term
             for fact in search:
@@ -55,6 +58,8 @@ class MemoryStore(Store):
     def _get_tags_as_items(self, prefix: str = '') -> List[Item]:
         tags: Dict[str, int] = {}
         for _, item in self._items.items():
+            if item.is_tx():
+                continue
             itags = get_tags(item)
             itags.add(Tag('db'))
             for t in itags:
@@ -69,6 +74,8 @@ class MemoryStore(Store):
     def _get_props_as_items(self, tag: str, prefix: str = '') -> List[Item]:
         tags: Dict[str, int] = {}
         for _, item in self._items.items():
+            if item.is_tx():
+                continue
             for f in item.facts:
                 if f.tag != tag:
                     continue
@@ -82,16 +89,20 @@ class MemoryStore(Store):
 
         return [Item(facts={Flag(tag, t), Value('db', 'count', str(tags[t]))}) for t in tags.keys()]
 
-    def _next_ref(self, uid: str) -> Fact:
-        new_ref = self.id_to_ref(len(self._items.keys()))
+    def _next_ref(self, uid: str, changeset: bool = False) -> Tuple[Fact, int]:
+        new_id = len(self._items.keys())
+        new_ref = self.id_to_ref(new_id)
         if self._get_item(new_ref):
             raise Exception(f"{new_ref} item should not already exist")
-        self._reflist[uid] = new_ref.value
-        return new_ref
+        self._reflist[new_id] = (new_ref.value, uid)
+        return (new_ref, new_id)
 
-    def _record_changeset(self, changeset: ChangeSet) -> int:
-        self._changesets.append(changeset)
-        return len(self._changesets) - 1
+    def _record_changeset(self, changeset: ChangeSet) -> str:
+        self._changesets[changeset.uuid] = changeset
+        return changeset.uuid
 
-    def _load_changeset(self, changeset_id: int) -> ChangeSet:
-        return self._changesets[changeset_id]
+    def _load_changeset(self, changeset_uuid: str) -> ChangeSet:
+        return self._changesets[changeset_uuid]
+
+    def _get_changesets_as_items(self) -> List[Item]:
+        return []

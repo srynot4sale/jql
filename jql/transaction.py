@@ -77,8 +77,13 @@ class Transaction:
 
     def get_hints(self, search: str = '') -> None:
         self.start()
-        # log.msg("tx.get_hints()", search=search)
+        # self.log.msg("tx.get_hints()", search=search)
         self.add_response(self._store.get_hints(search))
+
+    def get_changesets(self) -> None:
+        self.start()
+        self.log.msg("tx.get_changesets()")
+        self.add_response(self._store.get_changesets())
 
     def _add_change(self, change: Change) -> None:
         if not self.created:
@@ -86,6 +91,7 @@ class Transaction:
 
         if not self.changeset:
             self.changeset = ChangeSet(
+                uuid=str(uuid.uuid4()),
                 client='',
                 created=self.created,
                 query=self.query,
@@ -139,6 +145,10 @@ class Transaction:
             if search and self.query.endswith('/'):
                 search += '/'
             self.get_hints(search)
+            return self.response
+
+        if action == 'changesets':
+            self.get_changesets()
             return self.response
 
         raise Exception(f"Unknown query '{query}'")

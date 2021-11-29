@@ -1,4 +1,5 @@
 from flask import Flask, request, render_template, g
+from itertools import filterfalse
 import logging
 from typing import Any, Dict
 import urllib
@@ -6,7 +7,7 @@ import urllib
 
 from jql.client import Client
 from jql.sqlite import SqliteStore
-from jql.types import is_flag, is_tag, is_primary_ref, get_props, get_tags, get_flags, get_value, Ref, single, Tag, Flag, Fact
+from jql.types import is_flag, is_tag, is_primary_ref, get_props, get_tags, get_flags, get_value, has_sys_tag, Ref, single, Tag, Flag, Fact, tag_eq
 
 
 app = Flask(__name__)
@@ -91,7 +92,9 @@ def index():  # type: ignore
     primary_tag = get_toc()['primary_tag']
 
     tx = get_client().new_transaction()  # type: ignore
-    props = [(single(get_flags(t)), get_value(t, "db", "count")) for t in tx.q(f"HINTS #{primary_tag.tag}/") if get_flags(t)]
+
+    # Get non db/count fact
+    props = [(single(filterfalse(has_sys_tag, get_flags(t))), get_value(t, "db", "count")) for t in tx.q(f"HINTS #{primary_tag.tag}/") if get_flags(t)]
 
     tx = get_client().new_transaction()
     items = tx.q(str(primary_tag))
@@ -115,7 +118,7 @@ def results():  # type: ignore
 @app.route("/tag/<tagname>")
 def tag(tagname):  # type: ignore
     tx = get_client().new_transaction()  # type: ignore
-    props = [(single(get_flags(t)), get_value(t, "db", "count")) for t in tx.q(f"HINTS #{tagname}/") if get_flags(t)]
+    props = [(single(filterfalse(has_sys_tag, get_flags(t))), get_value(t, "db", "count")) for t in tx.q(f"HINTS #{tagname}/") if get_flags(t)]
 
     tx = get_client().new_transaction()  # type: ignore
     items = tx.q(f"#{tagname}")
@@ -129,7 +132,7 @@ def flag(tagname, flagname):  # type: ignore
     flag = Flag(tagname, flagname)
 
     tx = get_client().new_transaction()  # type: ignore
-    props = [(single(get_flags(t)), get_value(t, "db", "count")) for t in tx.q(f"HINTS #{tagname}/") if get_flags(t)]
+    props = [(single(filterfalse(has_sys_tag, get_flags(t))), get_value(t, "db", "count")) for t in tx.q(f"HINTS #{tagname}/") if get_flags(t)]
 
     tx = get_client().new_transaction()  # type: ignore
     items = tx.q(f"#{flag_str}")
@@ -140,7 +143,7 @@ def flag(tagname, flagname):  # type: ignore
 @app.route("/ref/<ref>")
 def ref(ref):  # type: ignore
     tx = get_client().new_transaction()  # type: ignore
-    item = tx.q(f"@{ref}")
-    item_tags = [Tag('db')] + list(get_tags(item[0]))
+    item = tx.q(f"@{ref}")[0]
+    item_tags = [Tag('db')] + [t for t in get_tags(item) if next(filter(tag_eq(t.tag), get_props(item)), None) is not None]
 
-    return render_template('ref.html', title=ref, context=[Ref(ref)], item=item[0], item_tags=item_tags)
+    return render_template('ref.html', title=ref, context=[Ref(ref)], item=item, item_tags=item_tags)

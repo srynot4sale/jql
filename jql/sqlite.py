@@ -17,16 +17,16 @@ class SqliteStore(Store):
         cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", ["config"])
         if not cur.fetchone():
             cur.execute('''CREATE TABLE config (key text, val text)''')
-            cur.execute('''CREATE TABLE reflist (ref text, uuid text)''')
+            cur.execute('''CREATE TABLE idlist (ref text, uuid text, changeset_uuid text)''')
             cur.execute('''CREATE TABLE facts
-                        (changeset int, ref text, tag text, prop text, val text)''')
+                        (changeset int, dbid int, tag text, prop text, val text)''')
             # cur.execute('''CREATE TABLE archived
             #            (ref text, tag text, prop text, val text)''')
 
         cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", ["changesets"])
         if not cur.fetchone():
             cur.execute('''CREATE TABLE changesets
-                        (client text, created timestamp, query text)''')
+                        (uuid text, client text, created timestamp, query text)''')
             cur.execute('''CREATE TABLE changes
                         (changeset int, ref text, uuid text, facts text, revoke int)''')
 
@@ -43,10 +43,15 @@ class SqliteStore(Store):
 
         self._conn.commit()
 
-    def _next_ref(self, uid: str) -> Fact:
+    def _next_ref(self, uid: str, changeset: bool = False) -> Tuple[Fact, int]:
         cur = self._conn.cursor()
 
-        cur.execute('INSERT INTO reflist (uuid) VALUES (?)', [uid])
+        if changeset:
+            uids = [None, uid]
+        else:
+            uids = [uid, None]
+
+        cur.execute('INSERT INTO idlist (uuid, changeset_uuid) VALUES (?, ?)', uids)
         itemid = int(cur.lastrowid)
 
         new_ref = self.id_to_ref(itemid)
@@ -57,17 +62,21 @@ class SqliteStore(Store):
             raise Exception("Ref and ID do not match")
 
         # Update row in reflist with generated hash
-        cur.execute('UPDATE reflist SET ref = ? WHERE rowid = ? AND uuid = ?', (new_ref.value, itemid, uid))
+        if changeset:
+            cur.execute('UPDATE idlist SET ref = ? WHERE rowid = ? AND uuid IS NULL AND changeset_uuid = ?', (new_ref.value, itemid, uids[1]))
+        else:
+            cur.execute('UPDATE idlist SET ref = ? WHERE rowid = ? AND uuid = ? AND changeset_uuid IS NULL', (new_ref.value, itemid, uids[0]))
+
         if cur.rowcount != 1:
             raise Exception(f"Unexpected result when storing new reference value '{new_ref.value}'")
 
         self._conn.commit()
-        return new_ref
+        return (new_ref, itemid)
 
     def _get_item(self, ref: Fact) -> Optional[Item]:
         cur = self._conn.cursor()
         facts: Set[Fact] = set()
-        for row in cur.execute('SELECT tag, prop, val FROM facts WHERE ref = ?', [ref.value]):
+        for row in cur.execute('SELECT f.tag, f.prop, f.val FROM facts f INNER JOIN idlist i ON i.rowid = f.dbid WHERE i.ref = ?', [ref.value]):
             facts.add(Fact(row[0], row[1], row[2]))
         if len(facts) == 0:
             return None
@@ -103,18 +112,19 @@ class SqliteStore(Store):
             else:
                 raise Exception(f'Unexpected search token {fact}')
 
-            where.append(f" INNER JOIN facts AS {prefix} ON r.ref = {prefix}.ref AND {w} ")
+            where.append(f" INNER JOIN facts AS {prefix} ON i.rowid = {prefix}.dbid AND {w} ")
 
         cur = self._conn.cursor()
         items_sql = '''
-        SELECT ref, tag, prop, val FROM facts WHERE ref IN (
-            SELECT DISTINCT r.ref
-            FROM reflist AS r
+        SELECT dbid, tag, prop, val FROM facts WHERE dbid IN (
+            SELECT DISTINCT i.rowid
+            FROM idlist AS i
         '''
         for w in where:
             items_sql += w
 
         items_sql += '''
+            AND i.changeset_uuid IS NULL
             )
         ORDER BY rowid
         '''
@@ -142,11 +152,12 @@ class SqliteStore(Store):
         return updated_item
 
     def _add_facts(self, ref: Fact, facts: FrozenSet[Fact]) -> None:
+        cur = self._conn.cursor()
+        dbid = cur.execute("SELECT rowid FROM idlist WHERE ref=?", (ref.value,)).fetchone()[0]
         values = []
         for f in facts:
-            values.append((ref.value, f.tag, f.prop, f.value))
-        cur = self._conn.cursor()
-        cur.executemany('INSERT INTO facts (ref, tag, prop, val) VALUES (?, ?, ?, ?)', values)
+            values.append((dbid, f.tag, f.prop, f.value))
+        cur.executemany('INSERT INTO facts (dbid, tag, prop, val) VALUES (?, ?, ?, ?)', values)
         self._conn.commit()
 
     def _get_tags_as_items(self, prefix: str = '') -> List[Item]:
@@ -154,41 +165,44 @@ class SqliteStore(Store):
 
         cur = self._conn.cursor()
         tags_sql = '''
-            SELECT tag, COUNT(DISTINCT ref)
-            FROM facts
-            GROUP BY tag
-            ORDER BY tag
+            SELECT f.tag, COUNT(DISTINCT f.dbid)
+            FROM facts f
+            INNER JOIN idlist i
+            ON i.rowid = f.dbid
+            AND i.changeset_uuid IS NULL
+            WHERE f.tag LIKE ?
+            GROUP BY f.tag
+            ORDER BY f.tag
         '''
 
-        for row in cur.execute(tags_sql):
-            if row[0].startswith(prefix):
-                tags.append((Tag(row[0]), str(row[1])))
+        for row in cur.execute(tags_sql, (f'{prefix}%', )):
+            tags.append((Tag(row[0]), str(row[1])))
 
         return [Item(facts={t[0], Value('db', 'count', t[1])}) for t in tags]
 
     def _get_props_as_items(self, tag: str, prefix: str = '') -> List[Item]:
-        tags: List[Tuple[Fact, str]] = []
+        props: List[Tuple[Fact, str]] = []
 
         cur = self._conn.cursor()
-        tags_sql = '''
-            SELECT prop, COUNT(DISTINCT ref)
-            FROM facts
-            WHERE tag = ?
-            GROUP BY prop
-            ORDER BY prop
+        props_sql = '''
+            SELECT f.prop, COUNT(DISTINCT f.dbid)
+            FROM facts f
+            INNER JOIN idlist i
+            ON i.rowid = f.dbid
+            AND i.changeset_uuid IS NULL
+            WHERE f.tag = ? AND f.prop != "" AND f.prop LIKE ?
+            GROUP BY f.prop
+            ORDER BY f.prop
         '''
 
-        for row in cur.execute(tags_sql, [tag]):
-            if row[0] == "" and prefix == "":
-                continue
-            if row[0].startswith(prefix):
-                tags.append((Flag(tag, row[0]), str(row[1])))
+        for row in cur.execute(props_sql, (tag, f'{prefix}%')):
+            props.append((Flag(tag, row[0]), str(row[1])))
 
-        return [Item(facts={t[0], Value('db', 'count', t[1])}) for t in tags]
+        return [Item(facts={t[0], Value('db', 'count', t[1])}) for t in props]
 
-    def _record_changeset(self, changeset: ChangeSet) -> int:
+    def _record_changeset(self, changeset: ChangeSet) -> str:
         cur = self._conn.cursor()
-        cur.execute('INSERT INTO changesets (client, created, query) VALUES (?, ?, ?)', (changeset.client, changeset.created, changeset.query))
+        cur.execute('INSERT INTO changesets (uuid, client, created, query) VALUES (?, ?, ?, ?)', (changeset.uuid, changeset.client, changeset.created, changeset.query))
         changeset_id = int(cur.lastrowid)
 
         values = []
@@ -201,23 +215,24 @@ class SqliteStore(Store):
         cur.executemany('INSERT INTO changes (changeset, ref, uuid, facts, revoke) VALUES (?, ?, ?, ?, ?)', values)
         self._conn.commit()
 
-        return changeset_id
+        return changeset.uuid
 
-    def _load_changeset(self, changeset_id: int) -> ChangeSet:
+    def _load_changeset(self, changeset_uuid: str) -> ChangeSet:
         cur = self._conn.cursor()
-        cur.execute('SELECT client, created, query FROM changesets WHERE rowid = ?', (changeset_id, ))
+        cur.execute('SELECT rowid, client, created, query FROM changesets WHERE uuid = ?', (changeset_uuid,))
         cs = cur.fetchone()
         if not cs:
-            raise Exception(f'Could not find changeset {changeset_id}')
+            raise Exception(f'Could not find changeset {changeset_uuid}')
 
         changeset = ChangeSet(
-            client=cs[0],
-            created=cs[1],
-            query=cs[2],
+            uuid=changeset_uuid,
+            client=cs[1],
+            created=cs[2],
+            query=cs[3],
             changes=[]
         )
 
-        for c in cur.execute('SELECT rowid, ref, uuid, revoke, facts FROM changes WHERE changeset = ?', (changeset_id, )):
+        for c in cur.execute('SELECT rowid, ref, uuid, revoke, facts FROM changes WHERE changeset = ?', (cs[0],)):
             ref = Ref(c[1]) if c[1] else None
             uid = c[2] if c[2] else None
             revoke = c[3]
@@ -233,3 +248,27 @@ class SqliteStore(Store):
             changeset.changes.append(change)
 
         return changeset
+
+    def _get_changesets_as_items(self) -> List[Item]:
+        cur = self._conn.cursor()
+
+        cs_sql = '''
+            SELECT i.rowid, f.tag, f.prop, f.val
+            FROM facts f
+            INNER JOIN idlist i
+            ON i.rowid = f.dbid
+            AND i.uuid IS NULL
+            ORDER BY f.rowid, f.dbid
+        '''
+
+        sets: List[Item] = []
+        facts = {}  # type: ignore
+        for row in cur.execute(cs_sql):
+            if row[0] not in facts.keys():
+                facts[row[0]] = set()
+            facts[row[0]].add(Fact(row[1], row[2], row[3]))
+
+        for fs in facts.values():
+            sets.append(Item(facts=fs))
+
+        return sets

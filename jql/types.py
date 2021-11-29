@@ -74,6 +74,10 @@ def has_value(fact: Fact) -> bool:
     return not value_eq("")(fact)
 
 
+def is_hidden_sys(fact: Fact) -> bool:
+    return has_sys_tag(fact) and (is_tag(fact) or is_ref(fact) or prop_eq("content")(fact))
+
+
 def has_sys_tag(fact: Fact) -> bool:
     return tag_eq("db")(fact)
 
@@ -179,6 +183,9 @@ class Item:
 
         return ' '.join(output)
 
+    def is_tx(self) -> bool:
+        return has_flag(self, "db", "tx")
+
     def as_tuples(self) -> set[tuple[str, str, str]]:
         return {f.as_tuple() for f in self.facts if not is_primary_ref(f)}
 
@@ -188,11 +195,11 @@ class Item:
 
 
 def get_facts(item: Item) -> Set[Fact]:
-    return {f for f in item.facts if not has_sys_tag(f)}
+    return {f for f in item.facts if not is_hidden_sys(f)}
 
 
 def get_tags(item: Item) -> Set[Fact]:
-    return {Tag(f.tag) for f in get_facts(item)}
+    return {Tag(f.tag) for f in get_facts(item) if not has_sys_tag(f)}
 
 
 def get_props(item: Item) -> Set[Fact]:
@@ -207,6 +214,10 @@ def get_value(item: Item, tag: str, prop: str) -> str:
     return single((f for f in item.facts if tag_eq(tag)(f) and prop_eq(prop)(f) and has_value(f))).value
 
 
+def has_flag(item: Item, tag: str, prop: str) -> bool:
+    return len({f for f in item.facts if tag_eq(tag)(f) and prop_eq(prop)(f)}) >= 1
+
+
 def update_item(item: Item, add: Iterable[Fact]) -> Item:
     return Item(item.facts.union(add))
 
@@ -218,5 +229,5 @@ def has_ref(item: Item) -> bool:
 def single(facts: Iterable[Fact]) -> Fact:
     f = list(facts)
     if len(f) != 1:
-        raise Exception(f'Expected a single fact, but got {len(f)}')
+        raise Exception(f'Expected a single fact, but got {len(f)}: {facts}')
     return f[0]
