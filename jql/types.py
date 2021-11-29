@@ -121,6 +121,8 @@ def Flag(tag: str, prop: str) -> Fact:
 
 
 def Value(tag: str, prop: str, value: str) -> Fact:
+    if not len(value):
+        raise Exception("Empty value supplied")
     return Fact(tag=tag, prop=prop, value=value)
 
 
