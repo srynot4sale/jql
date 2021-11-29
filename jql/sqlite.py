@@ -258,7 +258,7 @@ class SqliteStore(Store):
             INNER JOIN idlist i
             ON i.rowid = f.dbid
             AND i.uuid IS NULL
-            ORDER BY f.rowid, f.dbid
+            ORDER BY f.rowid DESC, f.dbid DESC
         '''
 
         sets: List[Item] = []
