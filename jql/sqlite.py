@@ -125,6 +125,8 @@ class SqliteStore(Store):
 
         items_sql += '''
             AND i.changeset_uuid IS NULL
+            ORDER BY i.rowid
+            LIMIT 100
             )
         ORDER BY rowid
         '''
@@ -253,11 +255,15 @@ class SqliteStore(Store):
         cur = self._conn.cursor()
 
         cs_sql = '''
-            SELECT i.rowid, f.tag, f.prop, f.val
+            SELECT f.dbid, f.tag, f.prop, f.val
             FROM facts f
-            INNER JOIN idlist i
-            ON i.rowid = f.dbid
-            AND i.uuid IS NULL
+            WHERE f.dbid IN (
+                SELECT i.rowid
+                FROM idlist i
+                WHERE i.uuid IS NULL
+                ORDER BY i.rowid DESC
+                LIMIT 100
+            )
             ORDER BY f.rowid DESC, f.dbid DESC
         '''
 
