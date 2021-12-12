@@ -3,6 +3,12 @@ from dataclasses import dataclass
 from typing import Callable, Set, Iterable, Generator
 
 
+class ItemException(Exception):
+    def __init__(self, message: str, item: Item) -> None:
+        self.item = item
+        self.message = f'{message} ({repr(item)})'
+
+
 @dataclass(frozen=True)
 class Fact:
     tag: str
@@ -135,7 +141,10 @@ def Ref(ref: str) -> Fact:
 
 
 def Content(value: str) -> Fact:
-    return Value(tag="db", prop="content", value=value)
+    if len(value):
+        return Value(tag="db", prop="content", value=value)
+    else:
+        return Flag(tag="db", prop="content")
 
 
 def fact_from_dict(f: dict[str, str]) -> Fact:
@@ -158,9 +167,9 @@ class Item:
         if len(f) == 1:
             return f[0]
         elif len(f) == 0:
-            raise Exception("No ref")
+            raise ItemException("No ref", self)
         else:
-            raise Exception("Multiple primary refs found")
+            raise ItemException("Multiple primary refs found", self)
 
     @property
     def content(self) -> Fact:
@@ -170,7 +179,7 @@ class Item:
         elif len(c) == 0:
             return Content("")
         else:
-            raise Exception("Multiple content facts found")
+            raise ItemException("Multiple content facts found", self)
 
     def __str__(self) -> str:
         output: list[str] = []

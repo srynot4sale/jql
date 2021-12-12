@@ -26,7 +26,9 @@
                 {% endfor %}
             </ul>
             <h3>
-                {{ make_link(i.ref)|safe }}
+                {% if has_ref(i) %}
+                    {{ make_link(i.ref)|safe }}
+                {% endif %}
                 {{ i.content }}
             </h3>
             <ul class="facts">

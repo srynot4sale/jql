@@ -7,7 +7,7 @@ import urllib
 
 from jql.client import Client
 from jql.sqlite import SqliteStore
-from jql.types import is_flag, is_tag, is_primary_ref, get_props, get_tags, get_flags, get_value, has_sys_tag, Ref, single, Tag, Flag, Fact, tag_eq
+from jql.types import is_flag, is_tag, is_primary_ref, get_props, get_tags, get_flags, get_value, has_ref, has_sys_tag, Ref, single, Tag, Flag, Fact, tag_eq
 
 
 app = Flask(__name__)
@@ -17,7 +17,7 @@ DATABASE = 'web.jdb'
 
 @app.context_processor
 def jql_utilities():  # type: ignore
-    return dict(get_tags=get_tags, get_flags=get_flags, get_props=get_props, is_primary_ref=is_primary_ref, is_tag=is_tag)
+    return dict(get_tags=get_tags, get_flags=get_flags, get_props=get_props, has_ref=has_ref, is_primary_ref=is_primary_ref, is_tag=is_tag)
 
 
 @app.context_processor
