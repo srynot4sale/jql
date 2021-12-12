@@ -1,6 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import Callable, Set, Iterable, Generator
+from typing import Any, Callable, Set, Iterable, Generator
 
 
 class ItemException(Exception):
@@ -55,6 +55,9 @@ class Fact:
             yield 'prop', self.prop
         if len(self.value):
             yield 'value', self.value
+
+    def __lt__(self, other: Any) -> bool:
+        return str(self) < str(other)
 
     def as_tuple(self) -> tuple[str, str, str]:
         return (self.tag, self.prop, self.value)
