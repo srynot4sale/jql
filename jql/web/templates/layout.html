@@ -53,22 +53,6 @@
         margin-right: 10px;
     }
 
-    @media (min-width: 1250px) {
-        aside {
-            float: left;
-            width: 20%;
-        }
-
-        aside nav ul {
-            margin-top: 0;
-        }
-
-        section {
-            margin-left: 25%;
-            margin-right: 10%;
-        }
-    }
-
     section ol {
         list-style: none;
         padding-left: 1em;
@@ -110,6 +94,10 @@
         background-color: #fdfdfd;
     }
 
+    div.details ul.tags {
+        padding-left: 0;
+    }
+
     div.details ul.tags li {
         list-style: none;
         display: inline-block;
@@ -118,9 +106,10 @@
 
     div.details ul.tags li a {
         display: inline-block;
-        padding: 5px;
+        padding: 10px;
         background-color: #ececec;
     }
+
     table.props {
         width: 100%;
     }
@@ -149,6 +138,60 @@
         min-width: 20%;
     }
 
+    @media (min-width: 1250px) {
+        aside {
+            float: left;
+            width: 20%;
+        }
+
+        aside nav .expand {
+            display: none;
+        }
+
+        aside nav ul {
+            margin-top: 0;
+        }
+
+        section {
+            margin-left: 25%;
+            margin-right: 10%;
+        }
+    }
+
+    @media (max-width: 1249px) {
+        aside nav ul.main {
+           display: none;
+        }
+
+        aside nav label.expand {
+            float: right;
+            cursor: pointer;
+            padding: 10px;
+            border-radius: 5px;
+            background-color: #ccc;
+            border: 1px solid #333;
+        }
+
+        aside nav input.expand {
+            display: none;
+        }
+
+        aside nav input:checked ~ ul.main {
+            display: block;
+        }
+
+        aside nav {
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+        }
+
+        section {
+            margin-left: 20px;
+            margin-right: 20px;
+        }
+    }
+
   </style>
 
 </head>
@@ -164,8 +207,10 @@
     <main>
         <aside>
             <nav>
+                <label for="navexpand" class="expand">+</label>
+                <input type="checkbox" class="expand" id="navexpand" name="navexpand" />
                 {% block subnav %}{% endblock %}
-                <ul>
+                <ul class="main">
                     <li><a href="/"><strong>{{ primary_tag }}</strong></a></li>
                     {% for tag, count in tags %}
                     <li>{{ make_link(tag)|safe }} ({{ count }})</li>
