@@ -40,4 +40,4 @@ repl: ## Run REPL
 
 .PHONY: web
 web: ## Run web server
-	FLASK_APP=jql.web FLASK_ENV=development venv/bin/python -m flask run --port 8787 --host 0.0.0.0
+	FLASK_APP=webjql FLASK_ENV=development venv/bin/python -m flask run --port 8787 --host 0.0.0.0
