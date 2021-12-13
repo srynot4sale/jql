@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="utf-8">
-  <title>JQL</title>
+  <title>JQL | {{ title }}</title>
   <meta name="description" content="">
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
@@ -39,30 +39,39 @@
     }
 
     header form#search {
-        float: right;
+        width: 100%;
+        display: flex;
     }
 
     header form#search input {
-        padding: 5px;
+        padding: 5px 20px;
         font-size: 125%;
     }
 
-    aside {
-        float: left;
-        width: 20%;
+    header form#search input#q {
+        flex: 2;
+        margin-right: 10px;
     }
 
-    aside nav ul {
-        margin-top: 0;
-    }
+    @media (min-width: 1250px) {
+        aside {
+            float: left;
+            width: 20%;
+        }
 
-    section {
-        margin-left: 25%;
-        margin-right: 10%;
+        aside nav ul {
+            margin-top: 0;
+        }
+
+        section {
+            margin-left: 25%;
+            margin-right: 10%;
+        }
     }
 
     section ol {
         list-style: none;
+        padding-left: 1em;
     }
 
     div.item {
@@ -146,11 +155,10 @@
 
 <body>
     <header>
-        <form id="search" method="GET" action="/results/">
-            <input type="text" name="q" />
+        <form id="search" method="GET" action="/query">
+            <input id="q" type="text" name="q" value="{{ title }}" />
             <input type="submit" value="Query" />
         </form>
-        <h1>{{ title }}</h1>
     </header>
 
     <main>

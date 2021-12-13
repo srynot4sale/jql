@@ -1,4 +1,4 @@
-from flask import Flask, request, render_template, g
+from flask import Flask, request, render_template, g, redirect
 from itertools import filterfalse
 import logging
 from typing import Any, Dict
@@ -15,6 +15,18 @@ app = Flask(__name__)
 DATABASE = 'web.jdb'
 
 
+def url_to_query(url: str) -> str:
+    query = url
+    query = query.replace('~', '#')
+    return query
+
+
+def query_to_url(query: str) -> str:
+    url = query
+    url = url.replace('#', '~')
+    return url
+
+
 @app.context_processor
 def jql_utilities():  # type: ignore
     return dict(get_tags=get_tags, get_flags=get_flags, get_props=get_props, has_ref=has_ref, is_primary_ref=is_primary_ref, is_tag=is_tag)
@@ -23,14 +35,13 @@ def jql_utilities():  # type: ignore
 @app.context_processor
 def html_utilities() -> Dict[str, Any]:
     def make_link(fact: Fact) -> str:
-        if is_tag(fact):
-            link = f'/tag/{fact.tag}'
-        elif is_primary_ref(fact):
-            link = f'/ref/{fact.value}'
-        elif is_flag(fact):
-            link = f'/flag/{fact.tag}/{fact.prop}'
+        if is_primary_ref(fact):
+            link = f'/{fact.value}'
         else:
-            link = f'/q?{urllib.parse.urlencode(str(fact))}'
+            strfact = str(fact)
+            url = query_to_url(strfact)
+            link = f'/q/{url}'
+
         return f'<a href="{link}">{fact}</a>'
 
     return dict(make_link=make_link)
@@ -87,63 +98,58 @@ def close_connection(exception):  # type: ignore
         del client
 
 
-@app.route("/")
-def index():  # type: ignore
-    primary_tag = get_toc()['primary_tag']
-
-    tx = get_client().new_transaction()  # type: ignore
-
-    # Get non db/count fact
-    props = [(single(filterfalse(has_sys_tag, get_flags(t))), get_value(t, "db", "count")) for t in tx.q(f"HINTS #{primary_tag.tag}/") if get_flags(t)]
-
-    tx = get_client().new_transaction()
-    items = tx.q(str(primary_tag))
-
-    return render_template('tag.html', title='JQL', context=[primary_tag], items=items, props=props)
-
-
-@app.route("/results/")
+@app.route("/query")
 def results():  # type: ignore
     query = request.args.get('q', '')
 
     if not len(query):
-        raise Exception('No query')
+        return redirect('/')
+
+    if query.startswith('@') and ' ' not in query:
+        return redirect(f'/{query.lstrip("@")}')
+
+    return redirect(f'/q/{query_to_url(query)}')
+
+
+@app.route("/", defaults={"query": ""})
+@app.route("/q/<path:query>")
+def query(query):  # type: ignore
+
+    query = url_to_query(query)
+
+    # Try figure out the context
+    context = []
+    props = []
+
+    tag = None
+    if not len(query):
+        tag = get_toc()['primary_tag'].tag
+        query = f'#{tag}'
+    else:
+        if query.startswith('#') and ' ' not in query:
+            q = query.lstrip('#')
+            if '/' in q:
+                q = q.split('/')
+                context = [Flag(q[0], q[1])]
+                tag = q[0]
+            else:
+                context = [Tag(q)]
+                tag = q
+
+    if tag:
+        tx = get_client().new_transaction()  # type: ignore
+        props = [(single(filterfalse(has_sys_tag, get_flags(t))), get_value(t, "db", "count")) for t in tx.q(f"HINTS #{tag}/") if get_flags(t)]
 
     tx = get_client().new_transaction()  # type: ignore
     items = tx.q(query)
 
-    return render_template('tag.html', title=query, context=[], props=[], items=items)
+    return render_template('tag.html', title=query, context=context, props=props, items=items)
 
 
-@app.route("/tag/<tagname>")
-def tag(tagname):  # type: ignore
-    tx = get_client().new_transaction()  # type: ignore
-    props = [(single(filterfalse(has_sys_tag, get_flags(t))), get_value(t, "db", "count")) for t in tx.q(f"HINTS #{tagname}/") if get_flags(t)]
-
-    tx = get_client().new_transaction()  # type: ignore
-    items = tx.q(f"#{tagname}")
-
-    return render_template('tag.html', title=tagname, context=[Tag(tagname)], props=props, items=items)
-
-
-@app.route("/flag/<tagname>/<flagname>")
-def flag(tagname, flagname):  # type: ignore
-    flag_str = f"{tagname}/{flagname}"
-    flag = Flag(tagname, flagname)
-
-    tx = get_client().new_transaction()  # type: ignore
-    props = [(single(filterfalse(has_sys_tag, get_flags(t))), get_value(t, "db", "count")) for t in tx.q(f"HINTS #{tagname}/") if get_flags(t)]
-
-    tx = get_client().new_transaction()  # type: ignore
-    items = tx.q(f"#{flag_str}")
-
-    return render_template('tag.html', title=flag_str, context=[flag], props=props, items=items)
-
-
-@app.route("/ref/<ref>")
+@app.route("/<ref>")
 def ref(ref):  # type: ignore
     tx = get_client().new_transaction()  # type: ignore
     item = tx.q(f"@{ref}")[0]
     item_tags = [Tag('db')] + [t for t in get_tags(item) if next(filter(tag_eq(t.tag), get_props(item)), None) is not None]
 
-    return render_template('ref.html', title=ref, context=[Ref(ref)], item=item, item_tags=item_tags)
+    return render_template('ref.html', title=f'@{ref}', context=[Ref(ref)], item=item, item_tags=item_tags)
