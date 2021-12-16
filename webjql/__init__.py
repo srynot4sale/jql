@@ -52,6 +52,12 @@ def list_dbs():  # type: ignore
     return render_template('dbs.html', databases=lib.get_databases())
 
 
+@app.route("/<db>/NOW")
+def create_db(db):  # type: ignore
+    lib.create_database(db)
+    return redirect(f'/{db}/')
+
+
 @app.route("/<db>/query")
 def results(db):  # type: ignore
     g.database = db

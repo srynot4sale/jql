@@ -194,7 +194,7 @@
 
 <body>
     <header>
-        <form id="search" method="GET" action="/query">
+        <form id="search" method="GET" action="/{{ g.database }}/query">
             <input id="q" type="text" name="q" value="{{ title }}" />
             <input type="submit" value="Query" />
         </form>
