@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="utf-8">
-  <title>JQL | {{ title }}</title>
+  <title>{{ g.database }} || {{ title }}</title>
   <meta name="description" content="">
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
@@ -13,10 +13,6 @@
   <meta property="og:image" content="">
 
   <link rel="icon" href="/favicon.ico" sizes="any">
-  <link rel="icon" href="/icon.svg" type="image/svg+xml">
-
-  <link rel="apple-touch-icon" href="icon.png">
-  <!-- Place favicon.ico in the root directory -->
 
   <meta name="theme-color" content="#fafafa">
 
@@ -211,7 +207,7 @@
                 <input type="checkbox" class="expand" id="navexpand" name="navexpand" />
                 {% block subnav %}{% endblock %}
                 <ul class="main">
-                    <li><a href="/"><strong>{{ primary_tag }}</strong></a></li>
+                    <li><a href="/{{ g.database }}/"><strong>{{ primary_tag }}</strong></a></li>
                     {% for tag, count in tags %}
                     <li>{{ make_link(tag)|safe }} ({{ count }})</li>
                     {% endfor %}
