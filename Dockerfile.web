@@ -1,0 +1,22 @@
+FROM python:3.8-slim
+
+MAINTAINER Aaron Barnes <aaron@io.nz>
+
+RUN apt-get update && \
+    apt-get upgrade -y && \
+    apt-get install -y python3-pip python3-dev
+
+RUN mkdir /app
+WORKDIR /app
+EXPOSE 8787
+
+ADD requirements.txt /tmp/
+
+RUN pip install --upgrade pip
+RUN pip install -r /tmp/requirements.txt
+
+COPY jql/ /app/jql
+COPY webjql/ /app/webjql
+
+ENV FLASK_APP=webjql
+CMD ["python", "-m", "flask", "run", "--port", "8787", "--host", "0.0.0.0"]

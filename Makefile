@@ -13,6 +13,14 @@ help:
 build: ## Build api image
 	docker-compose -f docker-compose.test.yml build
 
+.PHONY: cleanbuild
+cleanbuild: ## Build a clean, from repo HEAD, docker image
+	git clone . build/
+	cd build
+	docker build -t jql_web:latest -f Dockerfile.web .
+	cd ../
+	rm -Rf build/
+
 .PHONY: venv
 venv: ## Update virtualenv
 	virtualenv -p $$(which python3.8) venv
@@ -23,7 +31,8 @@ venv: ## Update virtualenv
 ## Test
 
 .PHONY: test
-test: build ## Run tests
+test: ## Run tests
+	docker-compose -f docker-compose.test.yml build
 	docker-compose -f docker-compose.test.yml up jql
 
 .PHONY: lint
