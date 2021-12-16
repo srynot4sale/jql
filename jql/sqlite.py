@@ -23,12 +23,17 @@ class SqliteStore(Store):
             # cur.execute('''CREATE TABLE archived
             #            (ref text, tag text, prop text, val text)''')
 
-        cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", ["changesets"])
-        if not cur.fetchone():
             cur.execute('''CREATE TABLE changesets
                         (uuid text, client text, created timestamp, query text)''')
             cur.execute('''CREATE TABLE changes
                         (changeset int, ref text, uuid text, facts text, revoke int)''')
+
+            cur.execute('''CREATE INDEX idx_idlist_ref ON idlist (ref)''')
+            cur.execute('''CREATE INDEX idx_facts_dbid ON facts (dbid)''')
+            cur.execute('''CREATE INDEX idx_changesets_uuid ON changesets (uuid)''')
+            cur.execute('''CREATE INDEX idx_changes_changeset ON changes (changeset)''')
+            cur.execute('''CREATE INDEX idx_facts_tag ON facts (tag)''')
+            cur.execute('''CREATE INDEX idx_facts_prop ON facts (prop)''')
 
         # Look for existing salt
         cur.execute("SELECT val FROM config WHERE key='salt'")
@@ -172,12 +177,20 @@ class SqliteStore(Store):
             INNER JOIN idlist i
             ON i.rowid = f.dbid
             AND i.changeset_uuid IS NULL
-            WHERE f.tag LIKE ?
+        '''
+
+        if len(prefix):
+            tags_sql += ' WHERE f.tag LIKE ? '
+            params = [f'{prefix}%']
+        else:
+            params = []
+
+        tags_sql += '''
             GROUP BY f.tag
             ORDER BY f.tag
         '''
 
-        for row in cur.execute(tags_sql, (f'{prefix}%', )):
+        for row in cur.execute(tags_sql, params):
             tags.append((Tag(row[0]), str(row[1])))
 
         return [Item(facts={t[0], Value('db', 'count', t[1])}) for t in tags]
@@ -192,12 +205,21 @@ class SqliteStore(Store):
             INNER JOIN idlist i
             ON i.rowid = f.dbid
             AND i.changeset_uuid IS NULL
-            WHERE f.tag = ? AND f.prop != "" AND f.prop LIKE ?
+            WHERE f.tag = ? AND f.prop != ""
+        '''
+
+        if len(prefix):
+            props_sql += ' AND f.prop LIKE ? '
+            params = [tag, f'{prefix}%']
+        else:
+            params = [tag]
+
+        props_sql += '''
             GROUP BY f.prop
             ORDER BY f.prop
         '''
 
-        for row in cur.execute(props_sql, (tag, f'{prefix}%')):
+        for row in cur.execute(props_sql, params):
             props.append((Flag(tag, row[0]), str(row[1])))
 
         return [Item(facts={t[0], Value('db', 'count', t[1])}) for t in props]
