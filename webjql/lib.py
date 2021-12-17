@@ -64,8 +64,7 @@ def get_toc():  # type: ignore
     if not hasattr(g, 'database'):
         return {}
 
-    tx = get_client().new_transaction()
-    all_tags = tx.q("HINTS")
+    all_tags = get_client().read("HINTS")
     full_count = None
     primary_tag = None
 

@@ -87,6 +87,7 @@ def results(db):  # type: ignore
 def query(db, query):  # type: ignore
     g.database = db
 
+    client = lib.get_client()
     query = lib.url_to_query(query)
 
     # Try figure out the context
@@ -96,7 +97,6 @@ def query(db, query):  # type: ignore
     tag = None
     if not len(query):
         tag = lib.get_toc()['primary_tag'].tag
-        query = f'#{tag}'
     else:
         if query.startswith('#') and ' ' not in query:
             q = query.lstrip('#')
@@ -109,11 +109,9 @@ def query(db, query):  # type: ignore
                 tag = q
 
     if tag and tag != "db":
-        tx = lib.get_client().new_transaction()
-        props = [(single(filterfalse(has_sys_tag, get_flags(t))), get_value(t, "db", "count")) for t in tx.q(f"HINTS #{tag}/") if get_flags(t)]
+        props = [(single(filterfalse(has_sys_tag, get_flags(t))), get_value(t, "db", "count")) for t in client.read(f"HINTS #{tag}/") if get_flags(t)]
 
-    tx = lib.get_client().new_transaction()
-    items = tx.q(query)
+    items = client.new_transaction().q(query or f'#{tag}')
 
     return render_template('tag.html', title=query, context=context, props=props, items=items)
 
@@ -122,8 +120,7 @@ def query(db, query):  # type: ignore
 def ref(db, ref):  # type: ignore
     g.database = db
 
-    tx = lib.get_client().new_transaction()
-    item = tx.q(f"@{ref}")[0]
+    item = lib.get_client().read(f"@{ref}")[0]
     item_tags = [Tag('db')] + [t for t in get_tags(item) if next(filter(tag_eq(t.tag), get_props(item)), None) is not None]
 
     return render_template('ref.html', title=f'@{ref}', context=[Ref(ref)], item=item, item_tags=item_tags)

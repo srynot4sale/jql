@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="utf-8">
-  <title>{{ g.database }} || {{ title }}</title>
+  <title>{{ g.database }} || {{ title|default('Home', true) }}</title>
   <meta name="description" content="">
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
@@ -207,7 +207,7 @@
                 <input type="checkbox" class="expand" id="navexpand" name="navexpand" />
                 {% block subnav %}{% endblock %}
                 <ul class="main">
-                    <li><a href="/{{ g.database }}/"><strong>{{ primary_tag }}</strong></a></li>
+                    <li><a href="/{{ g.database }}/"><strong>{{ primary_tag if primary_tag == '#db' else g.database }}</strong></a></li>
                     {% for tag, count in tags %}
                     <li>{{ make_link(tag)|safe }} ({{ count }})</li>
                     {% endfor %}
