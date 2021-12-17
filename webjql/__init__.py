@@ -98,7 +98,7 @@ def query(db, query):  # type: ignore
                 context = [Tag(q)]
                 tag = q
 
-    if tag:
+    if tag and tag != "db":
         tx = lib.get_client().new_transaction()
         props = [(single(filterfalse(has_sys_tag, get_flags(t))), get_value(t, "db", "count")) for t in tx.q(f"HINTS #{tag}/") if get_flags(t)]
 
