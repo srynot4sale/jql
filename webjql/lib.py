@@ -1,6 +1,6 @@
 import logging
 import os.path
-from typing import Dict, List
+from typing import Dict, List, Set
 from flask import g
 
 
@@ -10,33 +10,19 @@ from jql.types import get_tags, get_value, single, Tag
 
 
 ROOTDIR = os.path.join(os.getcwd(), 'dbs')
-DATABASES = {}
+DATABASES = set()
 
 
-def get_databases() -> List[str]:
-    global DATABASES
-
-    dbs = []
-
-    for e in os.listdir(ROOTDIR):
-        if e.endswith('.jdb'):
-            dbs.append(e[:-4])
-
-    for d in DATABASES.keys():
-        if d not in dbs:
-            del DATABASES[d]
-    
-    for d in dbs:
-        if d not in DATABASES.keys():
-            print(f'Loading new store {d}')
-            create_database(d)
-
-    return dbs
+def update_databases() -> Set[str]:
+    return set([d[:-4] for d in os.listdir(ROOTDIR) if d.endswith('.jdb')])
 
 
 def create_database(database: str) -> None:
-    global DATABASES
-    DATABASES[database] = SqliteStore(location=db_path(database))
+    # Confirm database str is a-z only
+    if not database.isalpha():
+        raise Exception(f'{database} is invalid')
+
+    SqliteStore(location=db_path(database))
 
 
 def url_to_query(url: str) -> str:
@@ -56,21 +42,20 @@ def db_path(database: str) -> str:
 
 
 def get_client() -> Client:
+    global DATABASES
     database = g.database
-
-    # Confirm database str is a-z only
-    if not database.isalpha():
-        raise Exception(f'{database} is invalid')
 
     # If not in DATABASES, rescan
     if database not in DATABASES:
-        dbs = get_databases()
-        if database not in dbs:
+        DATABASES = update_databases()
+
+        if database not in DATABASES:
             raise Exception(f'{database} does not exist!')
 
     if not hasattr(g, '_client'):
-        print('New client created')
-        g._client = Client(store=DATABASES[database], client="web:user", log_level=logging.ERROR)
+        print(f'Loading store {database}')
+        store = SqliteStore(location=db_path(database))
+        g._client = Client(store=store, client="web:user", log_level=logging.ERROR)
 
     return g._client
 

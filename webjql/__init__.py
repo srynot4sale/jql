@@ -49,7 +49,7 @@ def notfound():  # type: ignore
 
 @app.route("/")
 def list_dbs():  # type: ignore
-    return render_template('dbs.html', databases=lib.get_databases())
+    return render_template('dbs.html', databases=lib.update_databases())
 
 
 @app.route("/<db>/NOW")
