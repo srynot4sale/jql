@@ -4,3 +4,4 @@ colorama
 hashids
 prompt_toolkit
 flask
+sentry-sdk[flask]

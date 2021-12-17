@@ -1,6 +1,16 @@
+import sentry_sdk
 from flask import abort, Flask, request, render_template, g, redirect
+from sentry_sdk.integrations.flask import FlaskIntegration
 from itertools import filterfalse
+import os
 from typing import Any, Dict
+
+
+if os.getenv("SENTRY_DSN"):
+    sentry_sdk.init(
+        integrations=[FlaskIntegration()],
+        traces_sample_rate=0
+    )
 
 
 import webjql.lib as lib
