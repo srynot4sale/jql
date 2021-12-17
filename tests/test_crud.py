@@ -1,216 +1,238 @@
-from jql.types import Content, Item, Flag, Tag, update_item, Value
+from jql.db import Store
+from generator import yamltest
+
 
 interface = "query"
 
 
-def test_basic_create(db) -> None:
-    item = Item(facts={Content("go to supermarket"), Tag("todo"), Flag("todo", "completed")})
-
-    with db.tx() as tx:
-        tx.q("CREATE go to supermarket #todo #todo/completed")
-        db.assert_result(item)
-
-    with db.tx() as tx:
-        tx.q(str(db.last_ref))
-        db.assert_result(item)
-
-
-def test_multiple_creates(db) -> None:
-    item1 = Item(facts={Content("do dishes"), Tag("todo"), Tag("chores")})
-    item2 = Item(facts={Content("groceries"), Tag("chores")})
-
-    with db.tx() as tx:
-        tx.q("CREATE do dishes #todo #chores")
-        db.assert_result(item1)
-
-    with db.tx() as tx:
-        tx.q(str(db.last_ref))
-        db.assert_result(item1)
-        ref1 = db.last_ref
-
-    with db.tx() as tx:
-        tx.q("CREATE groceries #chores")
-        db.assert_result(item2)
-        ref2 = db.last_ref
-
-    assert ref1 != ref2
-
-    with db.tx() as tx:
-        tx.q(str(ref1))
-        db.assert_result(item1)
-
-    with db.tx() as tx:
-        tx.q(str(ref2))
-        db.assert_result(item2)
+@yamltest
+def test_basic_create(db: Store) -> str:
+    return '''
+    - q: "CREATE go to supermarket #todo #todo/completed"
+      result:
+        - db:
+            content: go to supermarket
+          todo:
+            completed:
+    '''
 
 
-def test_basic_create_add_tags(db) -> None:
-    item1 = Item(facts={Content("do dishes"), Tag("todo"), Tag("chores")})
-
-    with db.tx() as tx:
-        tx.q("CREATE do dishes #todo #chores")
-        db.assert_result(item1)
-
-    ref = db.last_ref
-
-    item2 = update_item(item1, {Tag("new")})
-
-    with db.tx() as tx:
-        tx.q(f"{str(ref)} SET #new")
-        db.assert_result(item2)
-        assert ref == db.last_ref
-
-    item3 = update_item(item2, {Tag("another")})
-
-    with db.tx() as tx:
-        tx.q(f"{str(ref)} SET #another")
-        db.assert_result(item3)
-        assert ref == db.last_ref
+@yamltest
+def test_multiple_creates(db: Store) -> str:
+    return '''
+    - q: "CREATE do dishes #todo #chores"
+      result:
+        - db:
+            content: do dishes
+          todo:
+          chores:
+    - q: "CREATE groceries #chores"
+      result:
+        - db:
+            content: groceries
+          chores:
+    '''
 
 
-def test_basic_create_add_facts(db) -> None:
-    item1 = Item(facts={Content("stuff"), Tag("chores")})
-
-    with db.tx() as tx:
-        tx.q("CREATE stuff #chores")
-        db.assert_result(item1)
-
-    ref = db.last_ref
-
-    with db.tx() as tx:
-        tx.q(str(ref))
-        db.assert_result(item1)
-
-    item2 = update_item(item1, {Flag("todo", "immediately")})
-
-    with db.tx() as tx:
-        tx.q(f"{str(ref)} SET #todo/immediately")
-        db.assert_result(item2)
-        assert ref == db.last_ref
-
-    item3 = update_item(item2, {Flag("todo", "nottomorrow")})
-
-    with db.tx() as tx:
-        tx.q(f"{str(ref)} SET #todo/nottomorrow")
-        db.assert_result(item3)
-        assert ref == db.last_ref
-
-    with db.tx() as tx:
-        tx.q(str(ref))
-        db.assert_result(item3)
+@yamltest
+def test_basic_create_add_tags(db: Store) -> str:
+    return '''
+    - q: "CREATE do dishes #todo #chores"
+      ref_alias: "a"
+      result:
+        - db:
+            content: do dishes
+          todo:
+          chores:
+    - q: "@a SET #new"
+      result:
+        - db:
+            content: do dishes
+          todo:
+          chores:
+          new:
+    - q: "@a SET #another"
+      result:
+        - db:
+            content: do dishes
+          todo:
+          chores:
+          new:
+          another:
+    '''
 
 
-def test_basic_tags_normalized(db) -> None:
-    item1 = Item(facts={Content("do dishes"), Tag("todo"), Tag("chores")})
-
-    with db.tx() as tx:
-        tx.q("CREATE do dishes #todo #chores")
-        db.assert_result(item1)
-
-    ref = db.last_ref
-
-    with db.tx() as tx:
-        tx.q(str(ref))
-        db.assert_result(item1)
-
-    item2 = update_item(item1, {Tag("new")})
-
-    with db.tx() as tx:
-        tx.q(f"{str(ref)} SET #new")
-        db.assert_result(item2)
-        assert ref == db.last_ref
-
-    with db.tx() as tx:
-        tx.q(str(ref))
-        db.assert_result(item2)
-
-    # Re-adding same tag shouldn't create two
-    with db.tx() as tx:
-        tx.q(f"{str(ref)} SET #new")
-        db.assert_result(item2)
-        assert ref == db.last_ref
-
-    with db.tx() as tx:
-        tx.q(str(ref))
-        db.assert_result(item2)
+@yamltest
+def test_basic_create_add_facts(db: Store) -> str:
+    return '''
+    - q: "CREATE stuff #chores"
+      ref_alias: "a"
+      result:
+        - db:
+            content: stuff
+          chores:
+    - q: "@a SET #todo/immediately"
+      result:
+        - db:
+            content: stuff
+          chores:
+          todo:
+            immediately:
+    - q: "@a SET #todo/nottomorrow"
+      result:
+        - db:
+            content: stuff
+          chores:
+          todo:
+            immediately:
+            nottomorrow:
+    '''
 
 
-def test_list(db) -> None:
-    item = Item(facts={Content("do dishes"), Tag("todo"), Tag("chores")})
-
-    with db.tx() as tx:
-        tx.q("CREATE do dishes #todo #chores")
-        db.assert_result(item)
-
-    with db.tx() as tx:
-        tx.q(str(db.last_ref))
-        db.assert_result(item)
-
-    def query(q, response):
-        with db.tx() as tx:
-            tx.q(q)
-            db.assert_result(response)
-
-    query("#chores", [item])
-    query("#todo", [item])
-    query("#notrealtag", [])
-    query("do dishes", [item])
-    query("dish", [item])
-    query("dush", [])
-    query("#todo #chores", [item])
-    query("#todo #fake", [])
-
-    item2 = Item(facts={Content("stuff"), Value("chores", "late", "yes")})
-    with db.tx() as tx:
-        tx.q("CREATE stuff #chores/late=yes")
-        db.assert_result(item2)
-
-    with db.tx() as tx:
-        tx.q(str(db.last_ref))
-        db.assert_result(item2)
-
-    query("#todo", [item])
-    query("#chores", [item, item2])
-    query("stuff", [item2])
-    query("#chores/late", [item2])
-    query("#chores/late=yes", [item2])
-    query("#chores/late=no", [])
+@yamltest
+def test_basic_tags_normalized(db: Store) -> str:
+    return '''
+    - q: "CREATE do dishes #todo #chores"
+      ref_alias: "a"
+      result:
+        - db:
+            content: do dishes
+          todo:
+          chores:
+    - q: "@a SET #new"
+      result:
+        - db:
+            content: do dishes
+          todo:
+          chores:
+          new:
+    - q: "@a SET #new"
+      result:
+        - db:
+            content: do dishes
+          todo:
+          chores:
+          new:
+    '''
 
 
-def test_list_by_content(db) -> None:
-    item = Item(facts={Content("do dishes for batman"), Tag("todo"), Tag("chores")})
-    item2 = Item(facts={Content("tears for bATman"), Value("chores", "late", "yes")})
+@yamltest
+def test_list(db: Store) -> str:
+    return '''
+    - q: "CREATE do dishes #todo #chores"
+      ref_alias: "a"
+      ref:
+        db:
+          content: do dishes
+        todo:
+        chores:
+      result:
+        - "a"
+    - q: "#chores"
+      result:
+        - "a"
+    - q: "#todo"
+      result:
+        - "a"
+    - q: "#notrealtag"
+      result:
+    - q: "do dishes"
+      result:
+        - "a"
+    - q: "dish"
+      result:
+        - "a"
+    - q: "disher"
+      result:
+    - q: "#todo #chores"
+      result:
+        - "a"
+    - q: "#todo #fake"
+      result:
+    - q: "CREATE stuff #chores/late=yes"
+      ref_alias: "b"
+      ref:
+        db:
+          content: stuff
+        chores:
+          late: "yes"
+      result:
+        - "b"
+    - q: "#todo"
+      result:
+        - "a"
+    - q: "#chores"
+      result:
+        - "a"
+        - "b"
+    - q: "stuff"
+      result:
+        - "b"
+    - q: "#chores/late"
+      result:
+        - "b"
+    - q: "#chores/late=yes"
+      result:
+        - "b"
+    - q: "#chores/late=no"
+      result:
+    '''
 
-    with db.tx() as tx:
-        tx.q("CREATE do dishes for batman #todo #chores")
-        db.assert_result(item)
-        ref = db.last_ref
 
-    with db.tx() as tx:
-        tx.q("CREATE tears for bATman #chores/late=yes")
-        db.assert_result(item2)
-        ref2 = db.last_ref
-
-    with db.tx() as tx:
-        tx.q(str(ref))
-        db.assert_result(item)
-
-    with db.tx() as tx:
-        tx.q(str(ref2))
-        db.assert_result(item2)
-
-    def query(q, response):
-        with db.tx() as tx:
-            tx.q(q)
-            db.assert_result(response)
-
-    query("#chores", [item, item2])
-    query("#todo", [item])
-    query("do dishes", [item])
-    query("dish", [item])
-    query("nopenope", [])
-    query("for batman", [item, item2])
-    query("for BATMAN", [item, item2])
-    query("for", [item, item2])
-    query("bat", [item, item2])
-    query("MAN", [item, item2])
+@yamltest
+def test_list_by_content(db: Store) -> str:
+    return '''
+    - q: "CREATE do dishes for batman #todo #chores"
+      ref_alias: "a"
+      ref:
+        db:
+          content: do dishes for batman
+        todo:
+        chores:
+      result:
+        - "a"
+    - q: "CREATE tears for bATman #chores/late=yes"
+      ref_alias: "b"
+      ref:
+        db:
+          content: tears for bATman
+        chores:
+          late: "yes"
+      result:
+        - "b"
+    - q: "#chores"
+      result:
+        - "a"
+        - "b"
+    - q: "#todo"
+      result:
+        - "a"
+    - q: "do dishes"
+      result:
+        - "a"
+    - q: "dish"
+      result:
+        - "a"
+    - q: "nopenope"
+      result:
+    - q: "for batman"
+      result:
+        - "a"
+        - "b"
+    - q: "for BATMAN"
+      result:
+        - "a"
+        - "b"
+    - q: "for"
+      result:
+        - "a"
+        - "b"
+    - q: "bat"
+      result:
+        - "a"
+        - "b"
+    - q: "MAN"
+      result:
+        - "a"
+        - "b"
+    '''
