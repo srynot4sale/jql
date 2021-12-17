@@ -201,7 +201,8 @@ class Item:
         return has_flag(self, "db", "tx")
 
     def as_tuples(self) -> set[tuple[str, str, str]]:
-        return {f.as_tuple() for f in self.facts if not is_primary_ref(f)}
+        props_tags = {Tag(f.tag) for f in get_props(self)}
+        return {f.as_tuple() for f in self.facts if not is_primary_ref(f) and f not in props_tags}
 
     @property
     def __iter__(self):  # type: ignore
