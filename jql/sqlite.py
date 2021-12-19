@@ -14,19 +14,13 @@ class SqliteStore(Store):
         self._conn = sqlite3.connect(location)
 
         cur = self._conn.cursor()
-        cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", ["config"])
-        if not cur.fetchone():
+        current_version = cur.execute('pragma user_version').fetchone()[0]
+        if not current_version:
             cur.execute('''CREATE TABLE config (key text, val text)''')
             cur.execute('''CREATE TABLE idlist (ref text, uuid text, changeset_uuid text)''')
-            cur.execute('''CREATE TABLE facts
-                        (changeset int, dbid int, tag text, prop text, val text, revoke int, current int)''')
-            # cur.execute('''CREATE TABLE archived
-            #            (ref text, tag text, prop text, val text)''')
-
-            cur.execute('''CREATE TABLE changesets
-                        (uuid text, client text, created timestamp, query text)''')
-            cur.execute('''CREATE TABLE changes
-                        (changeset int, ref text, uuid text, facts text, revoke int)''')
+            cur.execute('''CREATE TABLE facts (changeset int, dbid int, tag text, prop text, val text, revoke int, current int)''')
+            cur.execute('''CREATE TABLE changesets (uuid text, client text, created timestamp, query text)''')
+            cur.execute('''CREATE TABLE changes (changeset int, ref text, uuid text, facts text, revoke int)''')
 
             cur.execute('''CREATE INDEX idx_idlist_ref ON idlist (ref)''')
             cur.execute('''CREATE INDEX idx_facts_dbid ON facts (dbid)''')
@@ -34,15 +28,14 @@ class SqliteStore(Store):
             cur.execute('''CREATE INDEX idx_changes_changeset ON changes (changeset)''')
             cur.execute('''CREATE INDEX idx_facts_tag ON facts (tag)''')
             cur.execute('''CREATE INDEX idx_facts_prop ON facts (prop)''')
+            cur.execute('''CREATE INDEX idx_facts_current ON facts (current)''')
 
-        # Check if upgrading an old version
-        cur.execute("SELECT COUNT(*) AS col FROM pragma_table_info('facts') WHERE name = 'revoke'")
-        if not cur.fetchone():
-            cur.execute('''ALTER TABLE facts ADD COLUMN revoke int''')
-            cur.execute('''ALTER TABLE facts ADD COLUMN current int''')
-            cur.execute('''UPDATE facts SET current = 1''')
+            # Set schema version
+            cur.execute('''PRAGMA user_version = 1''')
 
-        cur.execute('''CREATE INDEX idx_facts_current ON facts (current)''')
+        if current_version < 2:
+            cur.execute('''CREATE INDEX idx_facts_revoke ON facts (revoke)''')
+            cur.execute('''PRAGMA user_version = 2''')
 
         # Look for existing salt
         cur.execute("SELECT val FROM config WHERE key='salt'")
@@ -90,7 +83,7 @@ class SqliteStore(Store):
     def _get_item(self, ref: Fact) -> Optional[Item]:
         cur = self._conn.cursor()
         facts: Set[Fact] = set()
-        for row in cur.execute('SELECT f.tag, f.prop, f.val FROM facts f INNER JOIN idlist i ON i.rowid = f.dbid WHERE f.current =1 AND f.revoke != 1 AND i.ref = ?', [ref.value]):
+        for row in cur.execute('SELECT f.tag, f.prop, f.val FROM facts f INNER JOIN idlist i ON i.rowid = f.dbid WHERE f.current = 1 AND f.revoke = 0 AND i.ref = ?', [ref.value]):
             facts.add(Fact(row[0], row[1], row[2]))
         if len(facts) == 0:
             return None
@@ -142,7 +135,7 @@ class SqliteStore(Store):
             ORDER BY i.rowid
             LIMIT 100
             )
-        AND current = 1 AND revoke != 1
+        AND current = 1 AND revoke = 0
         ORDER BY rowid
         '''
 
@@ -158,7 +151,7 @@ class SqliteStore(Store):
         return matches
 
     def _create_item(self, item: Item) -> Item:
-        self._add_facts(item.ref, item.facts)
+        self._add_facts(item.ref, item.facts, create=True)
         return item
 
     def _update_item(self, ref: Fact, new_facts: Set[Fact]) -> Item:
@@ -175,7 +168,7 @@ class SqliteStore(Store):
             raise Exception("Updated item not found")
         return updated_item
 
-    def _add_facts(self, ref: Fact, facts: FrozenSet[Fact], revoke: bool = False) -> None:
+    def _add_facts(self, ref: Fact, facts: FrozenSet[Fact], revoke: bool = False, create: bool = False) -> None:
         cur = self._conn.cursor()
         dbid = cur.execute("SELECT rowid FROM idlist WHERE ref=?", (ref.value,)).fetchone()[0]
         values = []
@@ -183,18 +176,19 @@ class SqliteStore(Store):
             values.append((dbid, f.tag, f.prop, f.value, revoke))
         cur.executemany('INSERT INTO facts (dbid, tag, prop, val, revoke, current) VALUES (?, ?, ?, ?, ?, 1)', values)
 
-        # Calculate current facts
-        cur.execute('''
-            UPDATE facts
-            SET current = 0
-            WHERE dbid = ?
-            AND rowid NOT IN (
-                SELECT MAX(rowid)
-                FROM facts
+        if not create:
+            # Calculate no longer current facts
+            cur.execute('''
+                UPDATE facts
+                SET current = 0
                 WHERE dbid = ?
-                GROUP BY tag, prop
-            )
-        ''', [dbid, dbid])
+                AND rowid NOT IN (
+                    SELECT MAX(rowid)
+                    FROM facts
+                    WHERE dbid = ?
+                    GROUP BY tag, prop
+                )
+            ''', [dbid, dbid])
 
         self._conn.commit()
 
@@ -208,10 +202,11 @@ class SqliteStore(Store):
             INNER JOIN idlist i
             ON i.rowid = f.dbid
             AND i.changeset_uuid IS NULL
+            WHERE f.revoke = 0 AND f.current = 1
         '''
 
         if len(prefix):
-            tags_sql += ' WHERE f.tag LIKE ? '
+            tags_sql += ' AND f.tag LIKE ? '
             params = [f'{prefix}%']
         else:
             params = []
@@ -236,7 +231,8 @@ class SqliteStore(Store):
             INNER JOIN idlist i
             ON i.rowid = f.dbid
             AND i.changeset_uuid IS NULL
-            WHERE f.tag = ? AND f.prop != ""
+            WHERE f.revoke = 0 AND f.current = 1
+            AND f.tag = ? AND f.prop != ""
         '''
 
         if len(prefix):
