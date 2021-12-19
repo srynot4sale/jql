@@ -20,6 +20,13 @@ CREATE go to supermarket #todo #todo/completed
  #db/content=go to supermarket
  #todo/completed
  #todo/overdue
+
+
+@1 DEL #todo/completed
+
+ #db/id=@1
+ #db/content=go to supermarket
+ #todo/overdue
 ```
 
 Update all matches

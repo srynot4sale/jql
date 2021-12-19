@@ -41,6 +41,11 @@ examples = [
         [Ref("544"), Tag("book"), Tag("todo")]
     ],
     [
+        "@4af DEL #book",
+        "del",
+        [Ref("4af"), Tag("book")]
+    ],
+    [
         "@aaa",
         "get",
         [Ref("aaa")]

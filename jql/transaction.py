@@ -58,12 +58,12 @@ class Transaction:
         self.log.msg("tx.create_item()", facts=facts)
         self._add_change(Change(uid=str(uuid.uuid4()), facts=set(facts)))
 
-    def update_item(self, ref: Fact, facts: Iterable[Fact]) -> None:
+    def update_item(self, ref: Fact, facts: Iterable[Fact], revoke: bool = False) -> None:
         if not facts:
             raise Exception("No data supplied")
         self.start()
-        self.log.msg("tx.update_item()", ref=ref, facts=facts)
-        self._add_change(Change(ref=ref, facts=set(facts)))
+        self.log.msg("tx.update_item()", ref=ref, facts=facts, revoke=revoke)
+        self._add_change(Change(ref=ref, facts=set(facts), revoke=revoke))
 
     def get_item(self, ref: Fact) -> None:
         self.start()
@@ -129,8 +129,8 @@ class Transaction:
             self.commit()
             return self.response
 
-        if action == 'set':
-            self.update_item(values[0], values[1:])
+        if action in ('set', 'del'):
+            self.update_item(values[0], values[1:], revoke=(action == 'del'))
             self.commit()
             return self.response
 

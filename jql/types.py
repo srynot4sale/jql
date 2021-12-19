@@ -237,6 +237,10 @@ def update_item(item: Item, add: Iterable[Fact]) -> Item:
     return Item(item.facts.union(add))
 
 
+def revoke_item_facts(item: Item, revoke: Iterable[Fact]) -> Item:
+    return Item(item.facts.difference(revoke))
+
+
 def has_ref(item: Item) -> bool:
     return next(filter(is_primary_ref, item.facts), None) is not None
 

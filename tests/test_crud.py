@@ -63,6 +63,56 @@ def test_basic_create_add_tags(db: Store) -> str:
 
 
 @yamltest
+def test_basic_add_remove_tags(db: Store) -> str:
+    return '''
+    - q: "CREATE do dishes #todo #chores"
+      ref_alias: "a"
+      result:
+        - db:
+            content: do dishes
+          todo:
+          chores:
+    - q: "@a SET #new"
+      result:
+        - db:
+            content: do dishes
+          todo:
+          chores:
+          new:
+    - q: "@a SET #another"
+      result:
+        - db:
+            content: do dishes
+          todo:
+          chores:
+          new:
+          another:
+    - q: "@a DEL #new"
+      result:
+        - db:
+            content: do dishes
+          todo:
+          chores:
+          another:
+    - q: "@a SET #new"
+      result:
+        - db:
+            content: do dishes
+          todo:
+          chores:
+          new:
+          another:
+    - q: "@a DEL #another"
+      result:
+        - db:
+            content: do dishes
+          todo:
+          chores:
+          new:
+    '''
+
+
+@yamltest
 def test_basic_create_add_facts(db: Store) -> str:
     return '''
     - q: "CREATE stuff #chores"
@@ -86,6 +136,47 @@ def test_basic_create_add_facts(db: Store) -> str:
           todo:
             immediately:
             nottomorrow:
+    '''
+
+
+@yamltest
+def test_basic_add_remove_facts(db: Store) -> str:
+    return '''
+    - q: "CREATE stuff #chores"
+      ref_alias: "a"
+      result:
+        - db:
+            content: stuff
+          chores:
+    - q: "@a SET #todo/immediately"
+      result:
+        - db:
+            content: stuff
+          chores:
+          todo:
+            immediately:
+    - q: "@a SET #todo/nottomorrow"
+      result:
+        - db:
+            content: stuff
+          chores:
+          todo:
+            immediately:
+            nottomorrow:
+    - q: "@a DEL #todo/nottomorrow"
+      result:
+        - db:
+            content: stuff
+          chores:
+          todo:
+            immediately:
+    - q: "@a DEL #todo"
+      result:
+        - db:
+            content: stuff
+          chores:
+          todo:
+            immediately:
     '''
 
 

@@ -3,7 +3,7 @@ from typing import Dict, List, Iterable, Set, Optional, Tuple
 
 from jql.changeset import ChangeSet
 from jql.db import Store
-from jql.types import Fact, Flag, Item, is_content, is_tag, is_flag, is_ref, has_value, get_tags, get_props, get_flags, Tag, update_item, Value
+from jql.types import Fact, Flag, Item, is_content, is_tag, is_flag, is_ref, has_value, get_tags, get_props, get_flags, Tag, revoke_item_facts, update_item, Value
 
 
 class MemoryStore(Store):
@@ -52,6 +52,14 @@ class MemoryStore(Store):
         if not item:
             raise Exception("Could not find item being updated")
         updated_item = update_item(item, new_facts)
+        self._items[item.ref.value] = updated_item
+        return updated_item
+
+    def _revoke_item_facts(self, ref: Fact, revoke: Set[Fact]) -> Item:
+        item = self._get_item(ref)
+        if not item:
+            raise Exception("Could not find item being updated")
+        updated_item = revoke_item_facts(item, revoke)
         self._items[item.ref.value] = updated_item
         return updated_item
 

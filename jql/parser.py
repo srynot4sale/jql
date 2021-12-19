@@ -12,6 +12,7 @@ jql_parser = Lark(r"""
           | "CHANGESETS"               -> changesets
           | match "SET" content        -> set
           | match "SET" data+          -> set
+          | match "DEL" data+          -> del
           | id                         -> get
           | data+                      -> list
           | content data*              -> list

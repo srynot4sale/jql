@@ -61,7 +61,10 @@ class Store(ABC):
         for change in changeset.changes:
             # create change
             if change.ref:
-                resp.append(self._update_item(change.ref, change.facts))
+                if change.revoke:
+                    resp.append(self._revoke_item_facts(change.ref, change.facts))
+                else:
+                    resp.append(self._update_item(change.ref, change.facts))
             elif change.uid:
                 new_ref, _ = self._next_ref(change.uid)
                 new_item = Item(facts=frozenset(change.facts.union({new_ref})))
@@ -98,6 +101,10 @@ class Store(ABC):
 
     @abstractmethod
     def _update_item(self, ref: Fact, new_facts: Set[Fact]) -> Item:
+        pass
+
+    @abstractmethod
+    def _revoke_item_facts(self, ref: Fact, revoke: Set[Fact]) -> Item:
         pass
 
     @abstractmethod

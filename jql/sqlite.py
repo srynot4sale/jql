@@ -19,7 +19,7 @@ class SqliteStore(Store):
             cur.execute('''CREATE TABLE config (key text, val text)''')
             cur.execute('''CREATE TABLE idlist (ref text, uuid text, changeset_uuid text)''')
             cur.execute('''CREATE TABLE facts
-                        (changeset int, dbid int, tag text, prop text, val text)''')
+                        (changeset int, dbid int, tag text, prop text, val text, revoke int, current int)''')
             # cur.execute('''CREATE TABLE archived
             #            (ref text, tag text, prop text, val text)''')
 
@@ -34,6 +34,15 @@ class SqliteStore(Store):
             cur.execute('''CREATE INDEX idx_changes_changeset ON changes (changeset)''')
             cur.execute('''CREATE INDEX idx_facts_tag ON facts (tag)''')
             cur.execute('''CREATE INDEX idx_facts_prop ON facts (prop)''')
+
+        # Check if upgrading an old version
+        cur.execute("SELECT COUNT(*) AS col FROM pragma_table_info('facts') WHERE name = 'revoke'")
+        if not cur.fetchone():
+            cur.execute('''ALTER TABLE facts ADD COLUMN revoke int''')
+            cur.execute('''ALTER TABLE facts ADD COLUMN current int''')
+            cur.execute('''UPDATE facts SET current = 1''')
+
+        cur.execute('''CREATE INDEX idx_facts_current ON facts (current)''')
 
         # Look for existing salt
         cur.execute("SELECT val FROM config WHERE key='salt'")
@@ -81,7 +90,7 @@ class SqliteStore(Store):
     def _get_item(self, ref: Fact) -> Optional[Item]:
         cur = self._conn.cursor()
         facts: Set[Fact] = set()
-        for row in cur.execute('SELECT f.tag, f.prop, f.val FROM facts f INNER JOIN idlist i ON i.rowid = f.dbid WHERE i.ref = ?', [ref.value]):
+        for row in cur.execute('SELECT f.tag, f.prop, f.val FROM facts f INNER JOIN idlist i ON i.rowid = f.dbid WHERE f.current =1 AND f.revoke != 1 AND i.ref = ?', [ref.value]):
             facts.add(Fact(row[0], row[1], row[2]))
         if len(facts) == 0:
             return None
@@ -133,6 +142,7 @@ class SqliteStore(Store):
             ORDER BY i.rowid
             LIMIT 100
             )
+        AND current = 1 AND revoke != 1
         ORDER BY rowid
         '''
 
@@ -158,13 +168,34 @@ class SqliteStore(Store):
             raise Exception("Updated item not found")
         return updated_item
 
-    def _add_facts(self, ref: Fact, facts: FrozenSet[Fact]) -> None:
+    def _revoke_item_facts(self, ref: Fact, revoke: Set[Fact]) -> Item:
+        self._add_facts(ref, frozenset(revoke), revoke=True)
+        updated_item = self._get_item(ref)
+        if not updated_item:
+            raise Exception("Updated item not found")
+        return updated_item
+
+    def _add_facts(self, ref: Fact, facts: FrozenSet[Fact], revoke: bool = False) -> None:
         cur = self._conn.cursor()
         dbid = cur.execute("SELECT rowid FROM idlist WHERE ref=?", (ref.value,)).fetchone()[0]
         values = []
         for f in facts:
-            values.append((dbid, f.tag, f.prop, f.value))
-        cur.executemany('INSERT INTO facts (dbid, tag, prop, val) VALUES (?, ?, ?, ?)', values)
+            values.append((dbid, f.tag, f.prop, f.value, revoke))
+        cur.executemany('INSERT INTO facts (dbid, tag, prop, val, revoke, current) VALUES (?, ?, ?, ?, ?, 1)', values)
+
+        # Calculate current facts
+        cur.execute('''
+            UPDATE facts
+            SET current = 0
+            WHERE dbid = ?
+            AND rowid NOT IN (
+                SELECT MAX(rowid)
+                FROM facts
+                WHERE dbid = ?
+                GROUP BY tag, prop
+            )
+        ''', [dbid, dbid])
+
         self._conn.commit()
 
     def _get_tags_as_items(self, prefix: str = '') -> List[Item]:
