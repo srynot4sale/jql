@@ -1,5 +1,6 @@
 import datetime
 import json
+import os
 import sqlite3
 from typing import FrozenSet, List, Iterable, Set, Optional, Tuple
 
@@ -12,6 +13,9 @@ from jql.types import Fact, Flag, Item, Ref, Value, is_tag, is_flag, is_content,
 class SqliteStore(Store):
     def __init__(self, location: str = ":memory:", salt: str = "") -> None:
         self._conn = sqlite3.connect(location)
+
+        if os.getenv("DEBUG") or os.getenv("FLASK_ENV") == "development":
+            self._conn.set_trace_callback(print)
 
         cur = self._conn.cursor()
         current_version = cur.execute('pragma user_version').fetchone()[0]
