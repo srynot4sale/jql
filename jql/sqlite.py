@@ -123,7 +123,7 @@ class SqliteStore(Store):
             else:
                 raise Exception(f'Unexpected search token {fact}')
 
-            where.append(f" INNER JOIN facts AS {prefix} ON i.rowid = {prefix}.dbid AND {w} ")
+            where.append(f" INNER JOIN facts AS {prefix} ON i.rowid = {prefix}.dbid AND {prefix}.current = 1 AND {prefix}.revoke = 0 AND {w} ")
 
         cur = self._conn.cursor()
         items_sql = '''

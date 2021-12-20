@@ -327,3 +327,36 @@ def test_list_by_content(db: Store) -> str:
         - "a"
         - "b"
     '''
+
+
+@yamltest
+def test_list_with_revoke(db: Store) -> str:
+    return '''
+    - q: "CREATE do dishes #todo #chores"
+      ref_alias: "a"
+      ref:
+        db:
+          content: do dishes
+        todo:
+        chores:
+      result:
+        - "a"
+    - q: "#chores"
+      result:
+        - "a"
+    - q: "#notrealtag"
+      result:
+    - q: "@a DEL #chores"
+      ref_alias: "b"
+      ref:
+        db:
+          content: do dishes
+        todo:
+      result:
+        - "b"
+    - q: "#chores"
+      result:
+    - q: "#todo"
+      result:
+        - "b"
+    '''
