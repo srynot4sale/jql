@@ -4,7 +4,7 @@ MAINTAINER Aaron Barnes <aaron@io.nz>
 
 RUN apt-get update && \
     apt-get upgrade -y && \
-    apt-get install -y python3-pip python3-dev
+    apt-get install -y python3-pip python3-dev sqlite
 
 RUN mkdir /app
 WORKDIR /app
