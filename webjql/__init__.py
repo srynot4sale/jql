@@ -1,5 +1,5 @@
 import sentry_sdk
-from flask import abort, Flask, request, render_template, g, redirect
+from flask import abort, Flask, request, render_template, g, redirect, session
 from sentry_sdk.integrations.flask import FlaskIntegration
 from itertools import filterfalse
 import os
@@ -18,6 +18,7 @@ from jql.types import is_tag, is_primary_ref, get_props, get_tags, get_flags, ge
 
 
 app = Flask(__name__)
+app.secret_key = os.getenv('FLASK_SECRET')
 
 
 @app.context_processor
@@ -68,16 +69,21 @@ def create_db(db):  # type: ignore
     return redirect(f'/{db}/')
 
 
-@app.route("/<db>/query")
-def results(db):  # type: ignore
+@app.route("/<db>/query", methods=['POST'])
+def post(db):  # type: ignore
     g.database = db
-    query = request.args.get('q', '')
+    query = request.form.get('q', '')
+    referrer = request.form.get('referrer', '')
 
     if not len(query):
         return redirect(f'/{db}/')
 
     if query.startswith('@') and ' ' not in query:
         return redirect(f'/{db}/{query.lstrip("@")}')
+
+    # Store referrer in case we need to redirect back
+    if referrer:
+        session[query] = referrer
 
     return redirect(f'/{db}/q/{lib.query_to_url(query)}')
 
@@ -111,7 +117,16 @@ def query(db, query):  # type: ignore
     if tag and tag != "db":
         props = [(single(filterfalse(has_sys_tag, get_flags(t))), get_value(t, "db", "count")) for t in client.read(f"HINTS #{tag}/") if get_flags(t)]
 
-    items = client.new_transaction().q(query or f'#{tag}')
+    # Run query
+    tx = client.new_transaction()
+    items = tx.q(query or f'#{tag}')
+
+    # Grab referrer out of session whether we use it or not (to stop the session dict growing and growing)
+    referrer = session.pop(query, f'/{db}/')
+
+    # If this is a write, redirect back to referrer
+    if tx.changeset:
+        return redirect(lib.query_to_url(referrer))
 
     return render_template('tag.html', title=query, context=context, props=props, items=items)
 

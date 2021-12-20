@@ -194,8 +194,9 @@
 
 <body>
     <header>
-        <form id="search" method="GET" action="/{{ g.database }}/query">
+        <form id="search" method="POST" action="/{{ g.database }}/query">
             <input id="q" type="text" name="q" value="{{ title }}" />
+            <input id="referrer" type="hidden" name="referrer" value="{{ title }}" />
             <input type="submit" value="Query" />
         </form>
     </header>
