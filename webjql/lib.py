@@ -66,7 +66,7 @@ def get_toc():  # type: ignore
 
     all_tags = get_client().read("HINTS")
     full_count = None
-    primary_tag = None
+    primary_tags = list()
 
     # Find the full count by looking for #db tag
     for t in all_tags:
@@ -81,13 +81,14 @@ def get_toc():  # type: ignore
             continue
 
         if full_count and get_value(t, "db", "count") == full_count:
-            if primary_tag:
-                raise Exception("Multiple primary tags found")
-            primary_tag = single(get_tags(t))
+            primary_tags.append((single(get_tags(t)), get_value(t, "db", "count")))
         else:
             tags.append((single(get_tags(t)), get_value(t, "db", "count")))
 
-    if not primary_tag:
+    if len(primary_tags) == 1:
+        primary_tag = primary_tags[0][0]
+    else:
         primary_tag = Tag('db')
+        tags.extend(primary_tags)
 
     return dict(tags=tags, primary_tag=primary_tag, full_count=full_count)
