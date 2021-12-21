@@ -4,7 +4,7 @@
 {% set ns = namespace(nonempty=false) %}
 {% for prop, count in props if count != full_count %}
     {% if not ns.nonempty %}
-    <ul>
+    <ul class="subnav">
     {% endif %}
     {% set ns.nonempty = true %}
         <li>{{ make_link(prop)|safe }} ({{ count }})</li>
@@ -22,7 +22,7 @@
         <div class="item">
             <ul class="tags">
                 {% for t in get_tags(i) if t not in context and t != primary_tag %}
-                <li>{{ make_link(t)|safe }}</li>
+                <li>{{ make_button(t)|safe }}</li>
                 {% endfor %}
             </ul>
             <h3>

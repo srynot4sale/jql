@@ -1,12 +1,12 @@
 {% extends "layout.html" %}
 {% block content %}
 
-<h2>{{ item.content }}</h2>
-
 <div class="details">
+    <h2>{{ item.content }}</h2>
+
     <ul class="tags">
     {% for t in get_tags(item) %}
-        <li>{{ make_link(t)|safe }}</li>
+        <li>{{ make_button(t)|safe }}</li>
     {% endfor %}
     </ul>
 
@@ -14,11 +14,11 @@
         <tbody>
             {% for t in item_tags %}
             <tr>
-                <th class="tag" colspan="2"><h3>#{{ t.tag }}</h3></th>
+                <td class="tag" colspan="2"><h3>#{{ t.tag }}</h3></td>
             </tr>
             {% for i in item.facts if i.tag == t.tag and i.prop %}
             <tr>
-                <th class="prop">{{ i.prop }}</th>
+                <td class="prop">{{ i.prop }}</td>
                 <td>{{ i.value|urlize }}</td>
             </tr>
             {% endfor %}

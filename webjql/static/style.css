@@ -1,0 +1,213 @@
+@font-face {
+    font-family: "Roboto";
+    src: local("Roboto"), url('/static/Roboto-Light.ttf') format('truetype');
+}
+
+html, body {
+    font-family: "Roboto";
+}
+
+nav form#search {
+    display: flex;
+}
+
+nav form#search input#sub {
+    flex: 1;
+}
+
+nav form#search input#q {
+    flex: 9;
+    margin: 0.3em 0.3em 0.3em 0;
+}
+
+section {
+    padding-top: 80px;
+}
+
+article ol {
+    list-style: none;
+    margin-top: 0;
+    padding-left: 1em;
+}
+
+div.item {
+    padding-bottom: 0.5em;
+}
+
+div.item h3 {
+    font-size: 100%;
+    font-weight: normal;
+    margin-bottom: 0;
+    padding: 0;
+}
+
+div.item ul li {
+    list-style: none;
+    display: inline-block;
+    margin-right: 20px;
+    font-size: 80%;
+}
+
+div.item ul.tags {
+    float: right;
+}
+
+div.item ul.tags li a {
+    display: inline-block;
+    padding: 5px 10px;
+}
+
+div.item ul.props li {
+    display: inline-block;
+    padding: 5px;
+}
+
+div.item ul.props li strong {
+    background-color: #fdfdfd;
+}
+
+div.details {
+    padding-right: 2em;
+}
+
+div.details ul.tags {
+    padding-left: 0;
+}
+
+div.details ul.tags li {
+    list-style: none;
+    display: inline-block;
+    margin-right: 20px;
+}
+
+div.details ul.tags li a {
+    display: inline-block;
+    padding: 5px 10px;
+}
+
+table.props {
+    width: 100%;
+}
+
+table.props td {
+    padding: 10px;
+}
+
+table.props tbody th.tag {
+    text-align: left;
+    padding-top: 20px;
+    padding-left: 0;
+}
+
+table.props tbody th.tag h3 {
+    border-bottom: 1px solid #333;
+    padding-bottom: 10px;
+    margin-bottom: 10px;
+}
+
+table.props tbody th.prop {
+    text-align: left;
+    background-color: #ededed;
+    font-weight: bold;
+    padding-right: 20px;
+    min-width: 20%;
+}
+
+.tagbutton1 {
+    background: blue;
+}
+
+.tagbutton2 {
+    background: red;
+}
+
+.tagbutton3 {
+    background: orange;
+}
+
+.tagbutton4 {
+    background: purple;
+}
+
+.tagbutton5 {
+    background: green;
+}
+
+.tagbutton6 {
+    background: brown;
+}
+
+@media (min-width: 1000px) {
+    main {
+        display: flex;
+    }
+
+    aside {
+        flex: 1;
+    }
+
+    aside .expand {
+        display: none;
+    }
+
+    aside ul {
+        margin-top: 0;
+    }
+
+    section {
+        flex: 5;
+    }
+}
+
+@media (max-width: 999px) {
+    aside {
+        text-align: right;
+        padding-right: 30px;
+    }
+
+    aside ul {
+        margin-top: 0;
+    }
+
+    aside ul li {
+        list-style: none;
+    }
+
+    aside ul.subnav {
+        display: inline-block;
+        margin-left: 0;
+        margin-right: 0;
+    }
+
+    aside ul.subnav li {
+        display: inline-block;
+        padding-right: 10px;
+    }
+
+    aside label {
+        display: inline-block;
+    }
+
+    aside ul.main {
+        display: none;
+
+    }
+
+    aside input.expand {
+        display: none;
+    }
+
+    aside input:checked ~ ul.main {
+        display: block;
+    }
+
+    aside {
+        border-bottom: 1px solid #ccc;
+        padding-bottom: 10px;
+        margin-bottom: 30px;
+    }
+
+    div.details {
+        padding-left: 2em;
+    }
+}

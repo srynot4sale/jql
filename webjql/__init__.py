@@ -21,6 +21,14 @@ app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET')
 
 
+app.TAG_COLORS = {}
+def get_tag_color(tag: str) -> str:
+    global app
+    if tag not in app.TAG_COLORS.keys():
+        app.TAG_COLORS[tag] = len(app.TAG_COLORS) + 1
+    return app.TAG_COLORS[tag]
+
+
 @app.context_processor
 def jql_utilities():  # type: ignore
     return dict(get_tags=get_tags, get_flags=get_flags, get_props=get_props, has_ref=has_ref, is_primary_ref=is_primary_ref, is_tag=is_tag)
@@ -28,7 +36,7 @@ def jql_utilities():  # type: ignore
 
 @app.context_processor
 def html_utilities() -> Dict[str, Any]:
-    def make_link(fact: Fact) -> str:
+    def make_link(fact: Fact, classes = None) -> str:
         if is_primary_ref(fact):
             link = f'{fact.value}'
         else:
@@ -36,9 +44,18 @@ def html_utilities() -> Dict[str, Any]:
             url = lib.query_to_url(strfact)
             link = f'q/{url}'
 
-        return f'<a href="/{g.database}/{link}">{fact}</a>'
+        if classes:
+            classes = ' '.join(classes)
+        else:
+            classes = ''
 
-    return dict(make_link=make_link)
+        return f'<a class="{classes}" href="/{g.database}/{link}">{fact}</a>'
+
+    def make_button(fact: Fact) -> str:
+        color = get_tag_color(fact.tag)
+        return make_link(fact=fact, classes=[f"button tagbutton tagbutton{color}"])
+
+    return dict(make_link=make_link, make_button=make_button)
 
 
 @app.context_processor
