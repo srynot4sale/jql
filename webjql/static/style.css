@@ -30,6 +30,10 @@ article ol {
     padding-left: 1em;
 }
 
+article ol li {
+    clear: both;
+}
+
 div.item {
     padding-bottom: 0.5em;
 }
