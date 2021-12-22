@@ -40,7 +40,7 @@ class Store(ABC):
         changeset = self._load_changeset(changeset_uuid)
 
         # Commit changeset
-        cs_ref, _ = self._next_ref(changeset.uuid, changeset=True)
+        cs_ref, _ = self._next_ref(changeset.uuid, created=str(changeset.created), changeset=True)
         content = json.dumps([c.to_dict() for c in changeset.changes])
 
         facts = {
@@ -66,7 +66,8 @@ class Store(ABC):
                 else:
                     resp.append(self._update_item(change.ref, change.facts))
             elif change.uid:
-                new_ref, _ = self._next_ref(change.uid)
+                created = Item(facts=frozenset(change.facts)).created_time
+                new_ref, _ = self._next_ref(change.uid, created=created.value)
                 new_item = Item(facts=frozenset(change.facts.union({new_ref})))
                 resp.append(self._create_item(new_item))
             else:
@@ -108,7 +109,7 @@ class Store(ABC):
         pass
 
     @abstractmethod
-    def _next_ref(self, uid: str, changeset: bool = False) -> Tuple[Fact, int]:
+    def _next_ref(self, uid: str, created: str, changeset: bool = False) -> Tuple[Fact, int]:
         pass
 
     @abstractmethod

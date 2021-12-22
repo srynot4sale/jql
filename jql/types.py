@@ -117,6 +117,10 @@ def is_content(fact: Fact) -> bool:
     return has_sys_tag(fact) and prop_eq("content")(fact)
 
 
+def is_created(fact: Fact) -> bool:
+    return has_sys_tag(fact) and prop_eq("created")(fact)
+
+
 def is_flag(fact: Fact) -> bool:
     return is_prop(fact) and not has_value(fact)
 
@@ -184,6 +188,10 @@ class Item:
         else:
             raise ItemException("Multiple content facts found", self)
 
+    @property
+    def created_time(self) -> Fact:
+        return get_fact(self, "db", "created")
+
     def __str__(self) -> str:
         output: list[str] = []
         if has_ref(self):
@@ -200,9 +208,12 @@ class Item:
     def is_tx(self) -> bool:
         return has_flag(self, "db", "tx")
 
+    def is_archived(self) -> bool:
+        return has_flag(self, "db", "archived")
+
     def as_tuples(self) -> set[tuple[str, str, str]]:
         props_tags = {Tag(f.tag) for f in get_props(self)}
-        return {f.as_tuple() for f in self.facts if not is_primary_ref(f) and f not in props_tags}
+        return {f.as_tuple() for f in self.facts if not is_primary_ref(f) and not is_created(f) and f not in props_tags}
 
     @property
     def __iter__(self):  # type: ignore
@@ -225,8 +236,15 @@ def get_flags(item: Item) -> Set[Fact]:
     return {Flag(f.tag, f.prop) for f in get_props(item)}
 
 
+def get_fact(item: Item, tag: str, prop: str) -> Fact:
+    return single((f for f in item.facts if tag_eq(tag)(f) and prop_eq(prop)(f)))
+
+
 def get_value(item: Item, tag: str, prop: str) -> str:
-    return single((f for f in item.facts if tag_eq(tag)(f) and prop_eq(prop)(f) and has_value(f))).value
+    fact = get_fact(item, tag, prop)
+    if not has_value(fact):
+        raise Exception(f'Expected a value, but got a flag: {fact}')
+    return fact.value
 
 
 def has_flag(item: Item, tag: str, prop: str) -> bool:

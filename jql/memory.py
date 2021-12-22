@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import Dict, List, Iterable, Set, Optional, Tuple
 
 
@@ -6,13 +7,21 @@ from jql.db import Store
 from jql.types import Fact, Flag, Item, is_content, is_tag, is_flag, is_ref, has_value, get_tags, get_props, get_flags, Tag, revoke_item_facts, update_item, Value
 
 
+@dataclass
+class MemoryRef:
+    ref: Fact
+    uid: str
+    created: str
+    archived: bool = False
+
+
 class MemoryStore(Store):
     def __init__(self, salt: str = "") -> None:
         super().__init__(salt)
 
         self._changesets: Dict[str, ChangeSet] = {}
         self._items: Dict[str, Item] = {}
-        self._reflist: Dict[int, Tuple[str, str]] = {}
+        self._reflist: Dict[int, MemoryRef] = {}
 
     def _get_item(self, ref: Fact) -> Optional[Item]:
         return self._items.get(ref.value, None)
@@ -22,6 +31,8 @@ class MemoryStore(Store):
         # Loop through every item
         for _, item in self._items.items():
             if item.is_tx():
+                continue
+            if item.is_archived():
                 continue
 
             match = True
@@ -53,6 +64,8 @@ class MemoryStore(Store):
             raise Exception("Could not find item being updated")
         updated_item = update_item(item, new_facts)
         self._items[item.ref.value] = updated_item
+        if updated_item.is_archived():
+            self._reflist[self.ref_to_id(ref)].archived = True
         return updated_item
 
     def _revoke_item_facts(self, ref: Fact, revoke: Set[Fact]) -> Item:
@@ -68,6 +81,8 @@ class MemoryStore(Store):
         for _, item in self._items.items():
             if item.is_tx():
                 continue
+            if item.is_archived():
+                continue
             itags = get_tags(item)
             itags.add(Tag('db'))
             for t in itags:
@@ -77,12 +92,14 @@ class MemoryStore(Store):
                     tags[t.tag] = 0
                 tags[t.tag] += 1
 
-        return [Item(facts={Tag(t), Value('db', 'count', str(tags[t]))}) for t in tags.keys()]
+        return [Item(facts={Tag(t), Value('db', 'count', str(tags[t]))}) for t in sorted(tags.keys())]
 
     def _get_props_as_items(self, tag: str, prefix: str = '') -> List[Item]:
         tags: Dict[str, int] = {}
         for _, item in self._items.items():
             if item.is_tx():
+                continue
+            if item.is_archived():
                 continue
             for f in item.facts:
                 if f.tag != tag:
@@ -95,14 +112,14 @@ class MemoryStore(Store):
                     tags[f.prop] = 0
                 tags[f.prop] += 1
 
-        return [Item(facts={Flag(tag, t), Value('db', 'count', str(tags[t]))}) for t in tags.keys()]
+        return [Item(facts={Flag(tag, t), Value('db', 'count', str(tags[t]))}) for t in sorted(tags.keys())]
 
-    def _next_ref(self, uid: str, changeset: bool = False) -> Tuple[Fact, int]:
+    def _next_ref(self, uid: str, created: str, changeset: bool = False) -> Tuple[Fact, int]:
         new_id = len(self._items.keys())
         new_ref = self.id_to_ref(new_id)
         if self._get_item(new_ref):
             raise Exception(f"{new_ref} item should not already exist")
-        self._reflist[new_id] = (new_ref.value, uid)
+        self._reflist[new_id] = MemoryRef(ref=new_ref, uid=uid, archived=False, created=created)
         return (new_ref, new_id)
 
     def _record_changeset(self, changeset: ChangeSet) -> str:

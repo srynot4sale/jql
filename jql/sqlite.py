@@ -41,6 +41,14 @@ class SqliteStore(Store):
             cur.execute('''CREATE INDEX idx_facts_revoke ON facts (revoke)''')
             cur.execute('''PRAGMA user_version = 2''')
 
+        if current_version < 3:
+            cur.execute('''ALTER TABLE idlist ADD COLUMN created timestamp''')
+            cur.execute('''ALTER TABLE idlist ADD COLUMN archived timestamp''')
+            cur.execute('''CREATE INDEX idx_idlist_created ON idlist (created)''')
+            cur.execute('''CREATE INDEX idx_idlist_archived ON idlist (archived)''')
+            cur.execute('''UPDATE idlist SET archived = 0, created = date('now')''')
+            cur.execute('''PRAGMA user_version = 3''')
+
         # Look for existing salt
         cur.execute("SELECT val FROM config WHERE key='salt'")
         existing_salt = cur.fetchone()
@@ -54,7 +62,7 @@ class SqliteStore(Store):
 
         self._conn.commit()
 
-    def _next_ref(self, uid: str, changeset: bool = False) -> Tuple[Fact, int]:
+    def _next_ref(self, uid: str, created: str, changeset: bool = False) -> Tuple[Fact, int]:
         cur = self._conn.cursor()
 
         if changeset:
@@ -62,7 +70,7 @@ class SqliteStore(Store):
         else:
             uids = [uid, None]
 
-        cur.execute('INSERT INTO idlist (uuid, changeset_uuid) VALUES (?, ?)', uids)
+        cur.execute('INSERT INTO idlist (created, uuid, changeset_uuid, archived) VALUES (?, ?, ?, 0)', [created, uids[0], uids[1]])
         itemid = int(cur.lastrowid)
 
         new_ref = self.id_to_ref(itemid)
@@ -127,25 +135,26 @@ class SqliteStore(Store):
 
         cur = self._conn.cursor()
         items_sql = '''
-        SELECT dbid, tag, prop, val FROM facts WHERE dbid IN (
-            SELECT DISTINCT i.rowid
-            FROM idlist AS i
+        SELECT f.dbid, f.tag, f.prop, f.val
+        FROM facts f
+        INNER JOIN idlist i
+        ON i.rowid = f.dbid
+        AND i.changeset_uuid IS NULL
+        AND i.archived = 0
         '''
         for w in where:
             items_sql += w
 
         items_sql += '''
-            AND i.changeset_uuid IS NULL
-            ORDER BY i.rowid
-            LIMIT 100
-            )
-        AND current = 1 AND revoke = 0
-        ORDER BY rowid
+        WHERE f.current = 1 AND f.revoke = 0
+        ORDER BY i.created
         '''
 
         facts = {}  # type: ignore
         for row in cur.execute(items_sql, d):
             if row[0] not in facts.keys():
+                if len(facts) >= 100:
+                    break
                 facts[row[0]] = set()
             facts[row[0]].add(Fact(row[1], row[2], row[3]))
 
@@ -163,6 +172,10 @@ class SqliteStore(Store):
         updated_item = self._get_item(ref)
         if not updated_item:
             raise Exception("Updated item not found")
+        if updated_item.is_archived():
+            cur = self._conn.cursor()
+            cur.execute('UPDATE idlist SET archived = 1 WHERE ref = ?', (ref.value, ))
+            self._conn.commit()
         return updated_item
 
     def _revoke_item_facts(self, ref: Fact, revoke: Set[Fact]) -> Item:
@@ -216,6 +229,7 @@ class SqliteStore(Store):
             params = []
 
         tags_sql += '''
+            AND i.archived = 0
             GROUP BY f.tag
             ORDER BY f.tag
         '''
@@ -246,6 +260,7 @@ class SqliteStore(Store):
             params = [tag]
 
         props_sql += '''
+            AND i.archived = 0
             GROUP BY f.prop
             ORDER BY f.prop
         '''

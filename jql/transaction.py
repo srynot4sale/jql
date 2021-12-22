@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from jql.db import Store
 
 from jql.parser import jql_parser, JqlTransformer
-from jql.types import Item, Fact, is_ref
+from jql.types import Item, Fact, is_ref, has_flag, Value
 from jql.changeset import Change, ChangeSet
 
 
@@ -54,9 +54,14 @@ class Transaction:
     def create_item(self, facts: Iterable[Fact]) -> None:
         if not facts:
             raise Exception("No data supplied")
+        facts = set(facts)
+
         self.start()
         self.log.msg("tx.create_item()", facts=facts)
-        self._add_change(Change(uid=str(uuid.uuid4()), facts=set(facts)))
+        if not has_flag(Item(facts=facts), 'db', 'created'):
+            facts.add(Value('db', 'created', str(datetime.datetime.now())))
+
+        self._add_change(Change(uid=str(uuid.uuid4()), facts=facts))
 
     def update_item(self, ref: Fact, facts: Iterable[Fact], revoke: bool = False) -> None:
         if not facts:

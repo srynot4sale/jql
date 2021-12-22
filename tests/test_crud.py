@@ -360,3 +360,37 @@ def test_list_with_revoke(db: Store) -> str:
       result:
         - "b"
     '''
+
+
+@yamltest
+def test_list_with_archive(db: Store) -> str:
+    return '''
+    - q: "CREATE do dishes #todo #chores"
+      ref_alias: "a"
+      ref:
+        db:
+          content: do dishes
+        todo:
+        chores:
+      result:
+        - "a"
+    - q: "#chores"
+      result:
+        - "a"
+    - q: "#notrealtag"
+      result:
+    - q: "@a SET #db/archived"
+      ref_alias: "b"
+      ref:
+        db:
+          content: do dishes
+          archived:
+        todo:
+        chores:
+      result:
+        - "b"
+    - q: "#chores"
+      result:
+    - q: "#todo"
+      result:
+    '''
