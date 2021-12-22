@@ -172,10 +172,6 @@ class SqliteStore(Store):
         updated_item = self._get_item(ref)
         if not updated_item:
             raise Exception("Updated item not found")
-        if updated_item.is_archived():
-            cur = self._conn.cursor()
-            cur.execute('UPDATE idlist SET archived = 1 WHERE ref = ?', (ref.value, ))
-            self._conn.commit()
         return updated_item
 
     def _revoke_item_facts(self, ref: Fact, revoke: Set[Fact]) -> Item:
@@ -187,10 +183,16 @@ class SqliteStore(Store):
 
     def _add_facts(self, ref: Fact, facts: FrozenSet[Fact], revoke: bool = False, create: bool = False) -> None:
         cur = self._conn.cursor()
-        dbid = cur.execute("SELECT rowid FROM idlist WHERE ref=?", (ref.value,)).fetchone()[0]
+        dbid, archived = cur.execute("SELECT rowid, archived FROM idlist WHERE ref=?", (ref.value,)).fetchone()
         values = []
+
+        archive_changed = None
         for f in facts:
+            if f.tag == "db" and f.prop == "archived":
+                archive_changed = not revoke
+
             values.append((dbid, f.tag, f.prop, f.value, revoke))
+
         cur.executemany('INSERT INTO facts (dbid, tag, prop, val, revoke, current) VALUES (?, ?, ?, ?, ?, 1)', values)
 
         if not create:
@@ -206,6 +208,10 @@ class SqliteStore(Store):
                     GROUP BY tag, prop
                 )
             ''', [dbid, dbid])
+
+        # Calculate if we need to change the archived state
+        if archive_changed is not None and archive_changed != archived:
+            cur.execute('UPDATE idlist SET archived = 1 WHERE ref = ?', (ref.value, ))
 
         self._conn.commit()
 

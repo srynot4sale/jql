@@ -35,6 +35,21 @@ def test_multiple_creates(db: Store) -> str:
 
 
 @yamltest
+def test_create_archived(db: Store) -> str:
+    return '''
+    - q: "CREATE go to supermarket #todo #todo/completed #db/archived"
+      result:
+        - db:
+            content: go to supermarket
+            archived:
+          todo:
+            completed:
+    - q: "#todo"
+      result:
+    '''
+
+
+@yamltest
 def test_basic_create_add_tags(db: Store) -> str:
     return '''
     - q: "CREATE do dishes #todo #chores"
