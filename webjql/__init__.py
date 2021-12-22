@@ -148,7 +148,7 @@ def query(db, query):  # type: ignore
 
     # If this is a write, redirect back to referrer
     if tx.changeset:
-        return redirect(lib.query_to_url(referrer))
+        return redirect(f'/{g.database}/q/{lib.query_to_url(referrer)}')
 
     return render_template('tag.html', title=query, context=context, props=props, items=items)
 
