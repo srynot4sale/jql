@@ -1,5 +1,5 @@
 import sentry_sdk
-from flask import abort, Flask, request, render_template, g, redirect, session
+from flask import abort, Flask, request, render_template, g, redirect, session, send_from_directory
 from sentry_sdk.integrations.flask import FlaskIntegration
 from itertools import filterfalse
 import os
@@ -75,9 +75,14 @@ def close_connection(exception):  # type: ignore
         del client
 
 
-@app.route("/favicon.ico")
-def notfound():  # type: ignore
-    abort(404)
+@app.route("/manifest.json")
+def manifest():  # type: ignore
+    return send_from_directory('static', 'manifest.json')
+
+
+@app.route("/service-worker.js")
+def serviceworker():  # type: ignore
+    return send_from_directory('static', 'service-worker.js')
 
 
 @app.route("/")
@@ -161,3 +166,14 @@ def ref(db, ref):  # type: ignore
     item_tags = [Tag('db')] + [t for t in get_tags(item) if next(filter(tag_eq(t.tag), get_props(item)), None) is not None]
 
     return render_template('ref.html', title=f'@{ref}', context=[Ref(ref)], item=item, item_tags=item_tags)
+
+
+@app.route("/share", methods=['POST'])
+def share():  # type: ignore
+    db = 'jql'
+    link = request.form.get('received_text', '')
+    title = request.form.get('received_title', '')
+
+    query = f'CREATE {title} {link} #tosort'
+
+    return redirect(f'/{db}/q/{lib.query_to_url(query)}')

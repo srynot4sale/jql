@@ -5,19 +5,20 @@
   <meta charset="utf-8">
   <title>{{ g.database }} || {{ title|default('Home', true) }}</title>
   <meta name="description" content="">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, user-scalable=no">
 
   <meta property="og:title" content="">
   <meta property="og:type" content="">
   <meta property="og:url" content="">
   <meta property="og:image" content="">
 
-  <link rel="icon" href="/static/favicon.ico" sizes="any">
+  <link rel="icon" href="/static/res/favicon.ico" sizes="any">
+  <link rel="manifest" href="/manifest.json">
+
   <link rel="stylesheet" href="/static/picnic.min.css">
   <link rel="stylesheet" href="/static/style.css">
 
   <meta name="theme-color" content="#fafafa">
-
 </head>
 
 <body>
@@ -49,6 +50,16 @@
             </article>
         </section>
     </main>
+
+    <script type="application/javascript">
+        /* Only register a service worker if it's supported */
+        if ('serviceWorker' in navigator) {
+            console.log('Service Workers supported');
+            navigator.serviceWorker.register('/service-worker.js');
+        } else {
+            console.log('Service Workers unsupported');
+        }
+    </script>
 
 </body>
 
