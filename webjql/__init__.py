@@ -56,7 +56,7 @@ def html_utilities() -> Dict[str, Any]:
             color = get_tag_color(fact.tag)
             link = lib.query_to_url(str(fact))
             tag = fact.tag.lstrip('#')
-            return f'<a class="button tagbutton tagbutton{color}" href="/{g.database}/{link}">{tag}</a>'
+            return f'<a class="button tagbutton tagbutton{color}" href="/{g.database}/q/{link}">{tag}</a>'
         else:
             return make_link(fact=fact)
 
