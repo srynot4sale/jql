@@ -149,11 +149,14 @@ def query(db, query):  # type: ignore
     items = tx.q(query or f'#{tag}')
 
     # Grab referrer out of session whether we use it or not (to stop the session dict growing and growing)
-    referrer = session.pop(query, f'/{db}/')
+    referrer = session.pop(query, '')
 
     # If this is a write, redirect back to referrer
     if tx.changeset:
-        return redirect(f'/{g.database}/q/{lib.query_to_url(referrer)}')
+        if not referrer:
+            return redirect(f'/{g.database}/')
+        else:
+            return redirect(f'/{g.database}/q/{lib.query_to_url(referrer)}')
 
     return render_template('tag.html', title=query, context=context, props=props, items=items)
 
