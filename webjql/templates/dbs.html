@@ -23,8 +23,8 @@
     <main>
         <nav>
             <ul class="main">
-                {% for database in databases %}
-                <li><a href="/{{ database }}/">{{ database }}</li>
+                {% for database in databases|sort %}
+                <li><a href="/{{ database }}/">{{ database }}</a></li>
                 {% endfor %}
             </ul>
         </nav>
