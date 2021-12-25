@@ -170,7 +170,34 @@ def ref(db, ref):  # type: ignore
     item = lib.get_client().read(f"@{ref}")[0]
     item_tags = [Tag('db')] + [t for t in get_tags(item) if next(filter(tag_eq(t.tag), get_props(item)), None) is not None]
 
-    return render_template('ref.html', title=f'@{ref}', context=[Ref(ref)], item=item, item_tags=item_tags)
+    actions = []
+
+    queries = [
+        'SET #db/archived'
+    ]
+    for tag in get_tags(item):
+        queries.append(f'DEL {str(tag)}')
+
+    tags = []
+    for t in lib.get_client().read("HINTS"):
+        if not get_tags(t):
+            continue
+        tags.append((single(get_tags(t)), get_value(t, "db", "count")))
+
+    tags = sorted(tags, key=lambda t: 0 - int(t[1]))
+    if len(tags) > 5:
+        tags = tags[0:5]
+
+    for tag in tags:  # type: ignore
+        if tag[0] in get_tags(item):  # type: ignore
+            continue
+        queries.append(f'SET {str(tag[0])}')  # type: ignore
+
+    for q in queries:
+        query = lib.query_to_url(f'@{ref} {q}')
+        actions.append(f'<a class="longpress button tagbutton" query="{q}" href="/{g.database}/q/{query}">{q}</a>')
+
+    return render_template('ref.html', title=f'@{ref}', context=[Ref(ref)], item=item, item_tags=item_tags, actions=actions)
 
 
 @app.route("/share", methods=['POST'])

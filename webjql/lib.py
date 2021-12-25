@@ -88,6 +88,8 @@ def get_toc():  # type: ignore
         else:
             tags.append((single(get_tags(t)), get_value(t, "db", "count")))
 
+    tags = sorted(tags, key=lambda t: 0 - int(t[1]))
+
     if len(primary_tags) == 1:
         primary_tag = primary_tags[0][0]
     else:
