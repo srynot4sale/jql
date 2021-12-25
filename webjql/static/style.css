@@ -148,19 +148,16 @@ table.props tbody th.prop {
     font-size: .9em;
 }
 
-.tagbutton1 { background-color: #001F3F; }
+.tagbutton1 { background-color: #0074D9; }
 .tagbutton2 { background-color: #39CCCC; }
 .tagbutton3 { background-color: #F012BE; }
 .tagbutton4 { background-color: #FF851B; }
 .tagbutton5 { background-color: #2ECC40; }
 .tagbutton6 { background-color: #B10DC9; }
-.tagbutton7 { background-color: #0074D9; }
+.tagbutton7 { background-color: #001F3F; }
 .tagbutton8 { background-color: #7FDBFF; }
 .tagbutton9 { background-color: #FF4136; }
-.tagbutton10 { background-color: #3D9970; }
-.tagbutton11 { background-color: #01FF70; }
-.tagbutton12 { background-color: #FFDC00; }
-.tagbutton13 { background-color: #85144B; }
+.tagbutton0 { background-color: #3D9970; }
 
 @media (min-width: 1000px) {
     main {

@@ -21,12 +21,13 @@ app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET')
 
 
-app.TAG_COLORS = {}
-def get_tag_color(tag: str) -> str:
+app.TAG_COLORS = []
+def get_tag_color(db: str, tag: str) -> str:
     global app
-    if tag not in app.TAG_COLORS.keys():
-        app.TAG_COLORS[tag] = len(app.TAG_COLORS) + 1
-    return app.TAG_COLORS[tag]
+    tag = tag.lstrip('#')
+    if tag not in app.TAG_COLORS:
+        app.TAG_COLORS.append(tag)
+    return app.TAG_COLORS.index(tag) % 10
 
 
 @app.context_processor
@@ -53,7 +54,7 @@ def html_utilities() -> Dict[str, Any]:
 
     def make_button(fact: Fact) -> str:
         if is_tag(fact):
-            color = get_tag_color(fact.tag)
+            color = get_tag_color(g.database, fact.tag)
             link = lib.query_to_url(str(fact))
             tag = fact.tag.lstrip('#')
             return f'<a class="button tagbutton tagbutton{color}" href="/{g.database}/q/{link}">{tag}</a>'
