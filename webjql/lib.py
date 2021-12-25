@@ -1,5 +1,6 @@
 import logging
 import os.path
+import urllib.parse
 from typing import Dict, List, Set
 from flask import g
 
@@ -27,6 +28,7 @@ def create_database(database: str) -> None:
 
 def url_to_query(url: str) -> str:
     query = url
+    query = urllib.parse.unquote(query)
     query = query.replace('~', '#')
     return query
 
@@ -34,6 +36,7 @@ def url_to_query(url: str) -> str:
 def query_to_url(query: str) -> str:
     url = query
     url = url.replace('#', '~')
+    url = urllib.parse.quote(url)
     return url
 
 
