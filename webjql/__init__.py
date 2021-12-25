@@ -156,7 +156,11 @@ def query(db, query):  # type: ignore
     # If this is a write, redirect back to referrer
     if tx.changeset:
         if not referrer:
-            return redirect(f'/{g.database}/')
+            if len(items) == 1:
+                item = items.pop()
+                return redirect(f'/{g.database}/{item.ref.value}')
+            else:
+                return redirect(f'/{g.database}/')
         else:
             return redirect(f'/{g.database}/q/{lib.query_to_url(referrer)}')
 
@@ -166,6 +170,8 @@ def query(db, query):  # type: ignore
 @app.route("/<db>/<ref>")
 def ref(db, ref):  # type: ignore
     g.database = db
+    if ref.startswith('@'):
+        return redirect(f'/{g.database}/{ref[1:]}')
 
     item = lib.get_client().read(f"@{ref}")[0]
     item_tags = [Tag('db')] + [t for t in get_tags(item) if next(filter(tag_eq(t.tag), get_props(item)), None) is not None]
@@ -207,5 +213,6 @@ def share():  # type: ignore
     title = request.form.get('received_title', '')
 
     query = f'CREATE {title} {link} #tosort'
+    session[query] = '#tosort'
 
     return redirect(f'/{db}/q/{lib.query_to_url(query)}')
