@@ -45,19 +45,20 @@ def html_utilities() -> Dict[str, Any]:
             url = lib.query_to_url(strfact)
             link = f'q/{url}'
 
+        query = str(fact)
+
         if classes:
             classes = ' '.join(classes)
         else:
             classes = ''
 
-        return f'<a class="{classes}" href="/{g.database}/{link}">{fact}</a>'
+        return f'<a class="longpress {classes}" href="/{g.database}/{link}" data-query="{query}">{fact}</a>'
 
     def make_button(fact: Fact) -> str:
         if is_tag(fact):
             color = get_tag_color(g.database, fact.tag)
             link = lib.query_to_url(str(fact))
-            tag = fact.tag.lstrip('#')
-            return f'<a class="button tagbutton tagbutton{color}" href="/{g.database}/q/{link}">{tag}</a>'
+            return f'<a class="longpress button tagbutton tagbutton{color}" data-query="{str(fact)}" href="/{g.database}/q/{link}">{str(fact)}</a>'
         else:
             return make_link(fact=fact)
 
