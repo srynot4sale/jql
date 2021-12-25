@@ -27,7 +27,7 @@
                 {{ i.content|urlize }}
             </h3>
             <ul class="tags">
-                {% for t in get_tags(i) if t not in context and t != primary_tag %}
+                {% for t in get_tags(i) if t not in context and t != primary_tag|sort %}
                 <li>{{ make_button(t)|safe }}</li>
                 {% endfor %}
             </ul>

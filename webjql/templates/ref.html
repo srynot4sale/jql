@@ -13,14 +13,14 @@
     </ul>
 
     <ul class="tags">
-    {% for t in get_tags(item) %}
+    {% for t in get_tags(item)|sort %}
         <li>{{ make_button(t)|safe }}</li>
     {% endfor %}
     </ul>
 
     <table class="props">
         <tbody>
-            {% for t in item_tags %}
+            {% for t in item_tags|sort %}
             <tr>
                 <td class="tag" colspan="2"><h3>#{{ t.tag }}</h3></td>
             </tr>

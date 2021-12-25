@@ -181,22 +181,27 @@ def ref(db, ref):  # type: ignore
     queries = [
         'SET #db/archived'
     ]
-    for tag in get_tags(item):
+    for tag in sorted(get_tags(item), key=str):
         queries.append(f'DEL {str(tag)}')
 
     tags = []
     for t in lib.get_client().read("HINTS"):
         if not get_tags(t):
             continue
-        tags.append((single(get_tags(t)), get_value(t, "db", "count")))
+        tag = single(get_tags(t))
+        if tag in get_tags(item):
+            continue
+        tags.append((tag, get_value(t, "db", "count")))
 
+    # Get top 5 most frequent tags
     tags = sorted(tags, key=lambda t: 0 - int(t[1]))
     if len(tags) > 5:
         tags = tags[0:5]
 
+    # Resort alphabetically
+    tags = sorted(tags, key=str)
+
     for tag in tags:  # type: ignore
-        if tag[0] in get_tags(item):  # type: ignore
-            continue
         queries.append(f'SET {str(tag[0])}')  # type: ignore
 
     for q in queries:
