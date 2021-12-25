@@ -60,7 +60,7 @@ article ol li {
 }
 
 div.item {
-    padding-bottom: 0.5em;
+    padding: 0;
 }
 
 div.item h3 {
@@ -78,12 +78,14 @@ div.item ul li {
 }
 
 div.item ul.tags {
-    float: right;
+    margin-left: 0;
+    padding-left: 0;
 }
 
 div.item ul.tags li a {
     display: inline-block;
-    padding: 2px 5px;
+    padding: 0px 5px;
+    margin: 0;
     border-radius: 5px;
 }
 

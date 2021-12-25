@@ -2,7 +2,7 @@
 {% block content %}
 
 <div class="details">
-    <h2>{{ item.content }}</h2>
+    <h2>{{ item.content|urlize }}</h2>
 
     <ul class="tags">
     {% for t in get_tags(item) %}
