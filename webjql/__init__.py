@@ -174,7 +174,7 @@ def ref(db, ref):  # type: ignore
 
 @app.route("/share", methods=['POST'])
 def share():  # type: ignore
-    db = 'jql'
+    db = 'pocket'
     link = request.form.get('received_text', '')
     title = request.form.get('received_title', '')
 
