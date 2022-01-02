@@ -36,13 +36,19 @@ nav form#search {
     display: flex;
 }
 
-nav form#search input#sub {
+nav form#search button#sub {
     flex: 1;
 }
 
 nav form#search input#q {
-    flex: 9;
+    flex: 50;
     margin: 0.3em 0.3em 0.3em 0;
+    font-size: 24px;
+}
+
+aside ul.main li.main a:first-child {
+    display: inline-block;
+    margin-right: 0.5em;
 }
 
 section {
@@ -170,12 +176,14 @@ table.props tbody th.prop {
         flex: 1;
     }
 
-    aside .expand {
+    aside .expand,
+    nav .expand {
         display: none;
     }
 
     aside ul {
         margin-top: 0;
+        list-style: none;
     }
 
     section {
@@ -208,13 +216,14 @@ table.props tbody th.prop {
         padding-right: 10px;
     }
 
-    aside label {
+    nav label.expand {
         display: inline-block;
+        padding: 0.5em 0.8em;
+        margin-left: 0.3em;
     }
 
     aside ul.main {
         display: none;
-
     }
 
     aside input.expand {

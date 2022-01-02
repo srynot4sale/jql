@@ -15,6 +15,7 @@
   <link rel="icon" href="/static/res/favicon.ico" sizes="any">
   <link rel="manifest" href="/manifest.json">
 
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   <link rel="stylesheet" href="/static/picnic.min.css">
   <link rel="stylesheet" href="/static/style.css">
 
@@ -26,7 +27,8 @@
         <form id="search" method="POST" action="/{{ g.database }}/query">
             <input id="q" type="text" name="q" value="{{ title }}" />
             <input id="referrer" type="hidden" name="referrer" value="{{ title }}" />
-            <input id="sub" type="submit" value="Query" />
+            <button id="sub" type="submit" class="material-icons">search</button>
+            <label for="navexpand" class="expand button material-icons">list</label>
         </form>
     </nav>
 
@@ -34,11 +36,9 @@
         <section class="flex five">
             <aside class="full fifth-1000">
                 {% block subnav %}{% endblock %}
-                <label for="navexpand" class="button expand">+</label>
                 <input type="checkbox" class="expand" id="navexpand" name="navexpand" />
                 <ul class="main">
-                    <li><a href="/">[dir]</a></li>
-                    <li><a href="/{{ g.database }}/"><strong>{{ primary_tag if primary_tag == '#db' else g.database }}</strong></a></li>
+                    <li class="main"><a class="material-icons" href="/">travel_explore</a> <a class="material-icons" href="/{{ g.database }}/">home</a></li>
                     {% for tag, count in tags %}
                     <li>{{ make_link(tag)|safe }} ({{ count }})</li>
                     {% endfor %}
