@@ -216,7 +216,8 @@ def ref(db, ref):  # type: ignore
         q = f'DEL {str(tag)}'
         query = lib.query_to_url(f'@{ref} {q}')
         label = f'{str(tag)} <span class="material-icons">delete_outline</span>'
-        tag_actions.append(f'<a class="longpress button tagbutton" query="{q}" href="/{g.database}/q/{query}">{label}</a>')
+        color = get_tag_color(g.database, tag.tag)
+        tag_actions.append(f'<a class="longpress button tagbutton tagbutton{color}" query="{q}" href="/{g.database}/q/{query}">{label}</a>')
     return render_template('ref.html', title=f'@{ref}', context=[Ref(ref)], item=item, item_tags=item_tags, actions=actions, tag_actions=tag_actions)
 
 
