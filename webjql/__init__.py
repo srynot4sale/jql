@@ -178,11 +178,9 @@ def ref(db, ref):  # type: ignore
 
     actions = []
 
-    queries = [
-        'SET #db/archived'
-    ]
-    for tag in sorted(get_tags(item), key=str):
-        queries.append(f'DEL {str(tag)}')
+    queries = []
+    if not item.is_archived():
+        queries.append('SET #db/archived')
 
     tags = []
     for t in lib.get_client().read("HINTS"):
@@ -206,18 +204,41 @@ def ref(db, ref):  # type: ignore
 
     for q in queries:
         query = lib.query_to_url(f'@{ref} {q}')
-        actions.append(f'<a class="longpress button tagbutton" query="{q}" href="/{g.database}/q/{query}">{q}</a>')
+        label = q
+        if label == 'SET #db/archived':
+            label = 'archive <span class="material-icons">archive</span>'
+        elif label.startswith('SET '):
+            label = label[3:] + ' <span class="material-icons">add_circle_outline</span>'
+        actions.append(f'<a class="longpress button tagbutton" query="{q}" href="/{g.database}/q/{query}">{label}</a>')
 
-    return render_template('ref.html', title=f'@{ref}', context=[Ref(ref)], item=item, item_tags=item_tags, actions=actions)
+    tag_actions = []
+    for tag in sorted(get_tags(item), key=str):
+        q = f'DEL {str(tag)}'
+        query = lib.query_to_url(f'@{ref} {q}')
+        label = f'{str(tag)} <span class="material-icons">delete_outline</span>'
+        tag_actions.append(f'<a class="longpress button tagbutton" query="{q}" href="/{g.database}/q/{query}">{label}</a>')
+    return render_template('ref.html', title=f'@{ref}', context=[Ref(ref)], item=item, item_tags=item_tags, actions=actions, tag_actions=tag_actions)
 
 
 @app.route("/share", methods=['POST'])
 def share():  # type: ignore
     db = 'pocket'
-    link = request.form.get('received_text', '')
+    content = []
+    text = request.form.get('received_text', '')
+    if text:
+        content.append(text)
     title = request.form.get('received_title', '')
+    if title:
+        content.append(title)
+    for k in request.form:
+        if k not in ('received_text', 'received_title'):
+            val = request.form.get(k)
+            if val:
+                content.append(val)
 
-    query = f'CREATE {title} {link} #tosort'
+    print(request.form)
+
+    query = f'CREATE {" ".join(content)} #tosort'
     session[query] = '#tosort'
 
     return redirect(f'/{db}/q/{lib.query_to_url(query)}')

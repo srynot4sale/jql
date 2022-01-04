@@ -156,6 +156,14 @@ table.props tbody th.prop {
     font-size: .9em;
 }
 
+.tagbutton span {
+    padding-left: 0.4em;
+    border-left: 1px dashed;
+    margin-left: 0.2em;
+    vertical-align: middle;
+    font-size: 20px;
+}
+
 .tagbutton1 { background-color: #0074D9; }
 .tagbutton2 { background-color: #39CCCC; }
 .tagbutton3 { background-color: #F012BE; }

@@ -13,8 +13,8 @@
     </ul>
 
     <ul class="tags">
-    {% for t in get_tags(item)|sort %}
-        <li>{{ make_button(t)|safe }}</li>
+    {% for t in tag_actions %}
+        <li>{{ t|safe }}</li>
     {% endfor %}
     </ul>
 
