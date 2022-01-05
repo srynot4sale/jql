@@ -1,24 +1,17 @@
 from __future__ import annotations
-from dataclasses import dataclass
-from typing import Any, Callable, Set, Iterable, Generator
+from typing import Any, Callable, Iterable, Iterator, NamedTuple
 
 
 class ItemException(Exception):
-    def __init__(self, message: str, item: Item) -> None:
+    def __init__(self, message: str, item: Facts) -> None:
         self.item = item
         self.message = f'{message} ({repr(item)})'
 
 
-@dataclass(frozen=True)
-class Fact:
+class Fact(NamedTuple):
     tag: str
     prop: str
     value: str
-
-    def __post_init__(self) -> None:
-        for a in ('tag', 'prop', 'value'):
-            if not isinstance(getattr(self, a), str):
-                raise ValueError(f"{a.capitalize()} attribute of fact was not a string: {repr(self.as_tuple())}")
 
     def __str__(self) -> str:
         if is_tag(self):
@@ -49,18 +42,14 @@ class Fact:
     def __len__(self) -> int:
         return len(self.tag) + len(self.prop) + len(self.value)
 
-    def __iter__(self) -> Generator:  # type: ignore
-        yield 'tag', self.tag
-        if len(self.prop):
-            yield 'prop', self.prop
-        if len(self.value):
-            yield 'value', self.value
-
     def __lt__(self, other: Any) -> bool:
         return str(self) < str(other)
 
     def as_tuple(self) -> tuple[str, str, str]:
         return (self.tag, self.prop, self.value)
+
+
+Facts = Iterable[Fact]
 
 
 def tag_eq(tag: str) -> Callable[[Fact], bool]:
@@ -158,7 +147,6 @@ def fact_from_dict(f: dict[str, str]) -> Fact:
     return Fact(tag=f['tag'], prop=f.get('prop', ''), value=f.get('value', ''))
 
 
-@dataclass(frozen=True)
 class Item:
     """
     An item is a group of facts at a point in time
@@ -168,87 +156,60 @@ class Item:
     def __init__(self, facts: Iterable[Fact]):
         super().__setattr__("facts", frozenset(facts))
 
-    @property
-    def ref(self) -> Fact:
-        f = list(filter(is_primary_ref, self.facts))
-        if len(f) == 1:
-            return f[0]
-        elif len(f) == 0:
-            raise ItemException("No ref", self)
-        else:
-            raise ItemException("Multiple primary refs found", self)
-
-    @property
-    def content(self) -> Fact:
-        c = list(filter(is_content, self.facts))
-        if len(c) == 1:
-            return c[0]
-        elif len(c) == 0:
-            return Content("")
-        else:
-            raise ItemException("Multiple content facts found", self)
-
-    @property
-    def created_time(self) -> Fact:
-        return get_fact(self, "db", "created")
-
     def __str__(self) -> str:
         output: list[str] = []
         if has_ref(self):
-            output.append(str(self.ref))
+            output.append(str(get_ref(self)))
 
-        if self.content and len(self.content.value):
-            output.append(str(self.content))
+        content = get_content(self)
+        if content and len(content):
+            output.append(str(content))
 
         output.extend([str(d) for d in get_tags(self)])
         output.extend([str(d) for d in get_props(self)])
 
         return ' '.join(output)
 
-    def is_tx(self) -> bool:
-        return has_flag(self, "db", "tx")
-
-    def is_archived(self) -> bool:
-        return has_flag(self, "db", "archived")
-
     def as_tuples(self) -> set[tuple[str, str, str]]:
         props_tags = {Tag(f.tag) for f in get_props(self)}
         return {f.as_tuple() for f in self.facts if not is_primary_ref(f) and not is_created(f) and f not in props_tags}
 
-    @property
-    def __iter__(self):  # type: ignore
-        return self.facts.__iter__
+    def __iter__(self) -> Iterator[Fact]:
+        return self.facts.__iter__()
+
+    def __next__(self) -> Fact:
+        return next(self)
 
 
-def get_facts(item: Item) -> Set[Fact]:
-    return {f for f in item.facts if not is_hidden_sys(f)}
+def get_facts(item: Facts) -> Facts:
+    return {f for f in item if not is_hidden_sys(f)}
 
 
-def get_tags(item: Item) -> Set[Fact]:
-    return {Tag(f.tag) for f in get_facts(item) if not has_sys_tag(f)}
+def get_tags(item: Facts) -> Facts:
+    return {Tag(f.tag) for f in item if not has_sys_tag(f)}
 
 
-def get_props(item: Item) -> Set[Fact]:
-    return {f for f in get_facts(item) if is_prop(f)}
+def get_props(item: Facts) -> Facts:
+    return {f for f in item if not is_hidden_sys(f) and is_prop(f)}
 
 
-def get_flags(item: Item) -> Set[Fact]:
+def get_flags(item: Facts) -> Facts:
     return {Flag(f.tag, f.prop) for f in get_props(item)}
 
 
-def get_fact(item: Item, tag: str, prop: str) -> Fact:
-    return single((f for f in item.facts if tag_eq(tag)(f) and prop_eq(prop)(f)))
+def get_fact(item: Facts, tag: str, prop: str) -> Fact:
+    return single((f for f in item if tag_eq(tag)(f) and prop_eq(prop)(f)))
 
 
-def get_value(item: Item, tag: str, prop: str) -> str:
+def get_value(item: Facts, tag: str, prop: str) -> str:
     fact = get_fact(item, tag, prop)
     if not has_value(fact):
         raise Exception(f'Expected a value, but got a flag: {fact}')
     return fact.value
 
 
-def has_flag(item: Item, tag: str, prop: str) -> bool:
-    return len({f for f in item.facts if tag_eq(tag)(f) and prop_eq(prop)(f)}) >= 1
+def has_flag(item: Facts, tag: str, prop: str) -> bool:
+    return len({f for f in item if tag_eq(tag)(f) and prop_eq(prop)(f)}) >= 1
 
 
 def update_item(item: Item, add: Iterable[Fact]) -> Item:
@@ -268,3 +229,35 @@ def single(facts: Iterable[Fact]) -> Fact:
     if len(f) != 1:
         raise Exception(f'Expected a single fact, but got {len(f)}: {facts}')
     return f[0]
+
+
+def is_tx(item: Facts) -> bool:
+    return has_flag(item, "db", "tx")
+
+
+def is_archived(item: Facts) -> bool:
+    return has_flag(item, "db", "archived")
+
+
+def get_ref(item: Facts) -> Fact:
+    f = list(filter(is_primary_ref, item))
+    if len(f) == 1:
+        return f[0]
+    elif len(f) == 0:
+        raise ItemException("No ref", item)
+    else:
+        raise ItemException("Multiple primary refs found", item)
+
+
+def get_content(item: Facts) -> Fact:
+    c = list(filter(is_content, item))
+    if len(c) == 1:
+        return c[0]
+    elif len(c) == 0:
+        return Content("")
+    else:
+        raise ItemException("Multiple content facts found", item)
+
+
+def get_created_time(item: Facts) -> Fact:
+    return get_fact(item, "db", "created")

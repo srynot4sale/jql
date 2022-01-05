@@ -11,7 +11,7 @@ from typing import List, Optional, Tuple
 
 from jql.client import Client
 from jql.sqlite import SqliteStore
-from jql.types import Item, get_props, get_tags, has_ref, has_sys_tag, has_value, get_facts, single
+from jql.types import Item, get_content, get_props, get_ref, get_tags, has_ref, has_sys_tag, has_value, get_facts, single
 
 
 if len(sys.argv) > 1:
@@ -68,12 +68,12 @@ def render_item(item: Item, shortcut: Optional[int] = None) -> HTML:
         output += '   '
 
     if has_ref(item):
-        output += f' <skyblue><b>{item.ref}</b></skyblue>'
+        output += f' <skyblue><b>{get_ref(item)}</b></skyblue>'
 
-    output += f' {e(item.content)}'
+    output += f' {e(get_content(item))}'
 
     for p in get_tags(item):
-        output += f' <green>#{p.tag}</green>'
+        output += f' <green>{p}</green>'
 
     for p in get_props(item):
         output += f' <green>#{p.tag}</green>'
@@ -119,7 +119,7 @@ while True:
                 shortcut = None
                 s = len(shortcuts)
                 if s < 10 and has_ref(r):
-                    ref = r.ref.value
+                    ref = get_ref(r).value
                     shortcuts.append((s, ref))
                     shortcut = s
 

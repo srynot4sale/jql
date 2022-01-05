@@ -22,9 +22,9 @@
         <div class="item">
             <h3>
                 {% if has_ref(i) %}
-                    {{ make_link(i.ref)|safe }}
+                    {{ make_link(get_ref(i))|safe }}
                 {% endif %}
-                {{ i.content|urlize }}
+                {{ get_content(i)|urlize }}
             </h3>
             <ul class="tags">
                 {% for t in get_tags(i) if t not in context and t != primary_tag|sort %}

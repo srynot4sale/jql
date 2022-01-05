@@ -7,7 +7,7 @@ from typing import FrozenSet, List, Iterable, Set, Optional, Tuple
 
 from jql.changeset import Change, ChangeSet
 from jql.db import Store
-from jql.types import Fact, Flag, Item, Ref, Value, is_tag, is_flag, is_content, has_value, Tag, fact_from_dict
+from jql.types import Fact, Flag, Item, Ref, Value, is_tag, is_flag, is_content, get_ref, has_value, Tag, fact_from_dict
 
 
 class SqliteStore(Store):
@@ -164,7 +164,7 @@ class SqliteStore(Store):
         return matches
 
     def _create_item(self, item: Item) -> Item:
-        self._add_facts(item.ref, item.facts, create=True)
+        self._add_facts(get_ref(item), item.facts, create=True)
         return item
 
     def _update_item(self, ref: Fact, new_facts: Set[Fact]) -> Item:
@@ -285,7 +285,7 @@ class SqliteStore(Store):
         for c in changeset.changes:
             ref = c.ref.value if c.ref else ''
             uid = c.uid if c.uid else ''
-            facts = json.dumps([dict(f) for f in c.facts])
+            facts = json.dumps([f._asdict() for f in c.facts])
             values.append((changeset_id, ref, uid, facts, c.revoke))
 
         cur.executemany('INSERT INTO changes (changeset, ref, uuid, facts, revoke) VALUES (?, ?, ?, ?, ?)', values)

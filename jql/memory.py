@@ -4,7 +4,7 @@ from typing import Dict, List, Iterable, Set, Optional, Tuple
 
 from jql.changeset import ChangeSet
 from jql.db import Store
-from jql.types import Fact, Flag, Item, is_content, is_tag, is_flag, is_ref, has_value, get_tags, get_props, get_flags, Tag, revoke_item_facts, update_item, Value
+from jql.types import Fact, Flag, Item, is_archived, is_content, is_tag, is_tx, is_flag, is_ref, has_value, get_content, get_ref, get_tags, get_props, get_flags, Tag, revoke_item_facts, update_item, Value
 
 
 @dataclass
@@ -30,9 +30,9 @@ class MemoryStore(Store):
         matches = []
         # Loop through every item
         for _, item in self._items.items():
-            if item.is_tx():
+            if is_tx(item):
                 continue
-            if item.is_archived():
+            if is_archived(item):
                 continue
 
             match = True
@@ -42,7 +42,7 @@ class MemoryStore(Store):
                     continue
                 elif is_flag(fact) and fact in get_flags(item):
                     continue
-                elif is_content(fact) and str(fact).lower() in str(item.content).lower():
+                elif is_content(fact) and str(fact).lower() in str(get_content(item)).lower():
                     # Content is a caseless substr match
                     continue
                 elif not is_ref(fact) and has_value(fact) and fact in get_props(item):
@@ -55,7 +55,7 @@ class MemoryStore(Store):
         return matches
 
     def _create_item(self, item: Item) -> Item:
-        self._items[item.ref.value] = item
+        self._items[get_ref(item).value] = item
         return item
 
     def _update_item(self, ref: Fact, new_facts: Set[Fact]) -> Item:
@@ -63,8 +63,8 @@ class MemoryStore(Store):
         if not item:
             raise Exception("Could not find item being updated")
         updated_item = update_item(item, new_facts)
-        self._items[item.ref.value] = updated_item
-        if updated_item.is_archived():
+        self._items[get_ref(item).value] = updated_item
+        if is_archived(updated_item):
             self._reflist[self.ref_to_id(ref)].archived = True
         return updated_item
 
@@ -73,17 +73,17 @@ class MemoryStore(Store):
         if not item:
             raise Exception("Could not find item being updated")
         updated_item = revoke_item_facts(item, revoke)
-        self._items[item.ref.value] = updated_item
+        self._items[get_ref(item).value] = updated_item
         return updated_item
 
     def _get_tags_as_items(self, prefix: str = '') -> List[Item]:
         tags: Dict[str, int] = {}
         for _, item in self._items.items():
-            if item.is_tx():
+            if is_tx(item):
                 continue
-            if item.is_archived():
+            if is_archived(item):
                 continue
-            itags = get_tags(item)
+            itags = set(get_tags(item))
             itags.add(Tag('db'))
             for t in itags:
                 if not t.tag.startswith(prefix):
@@ -97,9 +97,9 @@ class MemoryStore(Store):
     def _get_props_as_items(self, tag: str, prefix: str = '') -> List[Item]:
         tags: Dict[str, int] = {}
         for _, item in self._items.items():
-            if item.is_tx():
+            if is_tx(item):
                 continue
-            if item.is_archived():
+            if is_archived(item):
                 continue
             for f in item.facts:
                 if f.tag != tag:

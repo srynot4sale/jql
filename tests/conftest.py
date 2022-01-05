@@ -7,7 +7,7 @@ from typing import Dict, Generator, Iterator, List, Literal, Union
 from jql.client import Client
 from jql.memory import MemoryStore
 from jql.sqlite import SqliteStore
-from jql.types import Fact, Item, Ref
+from jql.types import get_ref, Fact, Item, Ref
 from jql.transaction import Transaction
 
 
@@ -47,7 +47,7 @@ class dbclass:
     @property
     def last_ref(self) -> Fact:
         # Return a copy of the ref
-        return Ref(self.single.ref.value)
+        return Ref(get_ref(self.single).value)
 
     def assert_result(self, comparison) -> None:  # type: ignore
         if isinstance(comparison, Item):

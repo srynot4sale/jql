@@ -1,18 +1,18 @@
-from jql.types import Content, Flag, Value, Item, Ref, Tag, get_tags, get_props, get_flags
+from jql.types import Content, Flag, Value, Item, Ref, Tag, get_content, get_ref, get_tags, get_props, get_flags
 
 
 def test_content() -> None:
     i = Item({Content("here it is")})
-    assert str(i.content) == "here it is"
+    assert str(get_content(i)) == "here it is"
 
     j = Item({Content("here is no 2")})
-    assert str(i.content) == "here it is"
-    assert str(j.content) == "here is no 2"
+    assert str(get_content(i)) == "here it is"
+    assert str(get_content(j)) == "here is no 2"
 
 
 def test_ref() -> None:
     i = Item({Ref("23"), Content("here it is")})
-    assert str(i.ref) == "@23"
+    assert str(get_ref(i)) == "@23"
 
 
 def test_tags() -> None:

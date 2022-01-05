@@ -14,7 +14,7 @@ if os.getenv("SENTRY_DSN"):
 
 
 import webjql.lib as lib
-from jql.types import is_tag, is_primary_ref, get_props, get_tags, get_flags, get_value, has_ref, has_sys_tag, Ref, single, Tag, Flag, Fact, tag_eq
+from jql.types import is_archived, is_tag, is_primary_ref, get_content, get_ref, get_props, get_tags, get_flags, get_value, has_ref, has_sys_tag, Ref, single, Tag, Flag, Fact, tag_eq
 
 
 app = Flask(__name__)
@@ -32,7 +32,7 @@ def get_tag_color(db: str, tag: str) -> str:
 
 @app.context_processor
 def jql_utilities():  # type: ignore
-    return dict(get_tags=get_tags, get_flags=get_flags, get_props=get_props, has_ref=has_ref, is_primary_ref=is_primary_ref, is_tag=is_tag)
+    return dict(get_tags=get_tags, get_flags=get_flags, get_props=get_props, has_ref=has_ref, is_primary_ref=is_primary_ref, is_tag=is_tag, get_ref=get_ref, get_content=get_content)
 
 
 @app.context_processor
@@ -179,7 +179,7 @@ def ref(db, ref):  # type: ignore
     actions = []
 
     queries = []
-    if not item.is_archived():
+    if not is_archived(item):
         queries.append('SET #db/archived')
 
     tags = []
