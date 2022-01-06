@@ -18,3 +18,4 @@ __pycache__/
 /dbs/
 /temp/
 Makefile.local
+/jql.egg-info/
