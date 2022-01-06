@@ -13,14 +13,6 @@ help:
 build: ## Build api image
 	docker-compose -f docker-compose.test.yml build
 
-.PHONY: cleanbuild
-cleanbuild: ## Build a clean, from repo HEAD, docker image
-	git clone . build/
-	cd build
-	docker build -t jql_web:latest -f Dockerfile.web .
-	cd ../
-	rm -Rf build/
-
 .PHONY: venv
 venv: ## Update virtualenv
 	virtualenv -p $$(which python3.8) venv
@@ -46,10 +38,6 @@ lint: ## Lint code
 .PHONY: repl
 repl: ## Run REPL
 	venv/bin/python -m jql.repl
-
-.PHONY: web
-web: ## Run web server
-	FLASK_APP=webjql FLASK_SECRET=test FLASK_ENV=development venv/bin/python -m flask run --port 8787 --host 0.0.0.0
 
 
 -include Makefile.local
