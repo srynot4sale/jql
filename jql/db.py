@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from hashids import Hashids  # type: ignore
+import datetime
 import json
 import string
 from typing import List, Optional, Iterable, Set, Tuple
@@ -46,6 +47,7 @@ class Store(ABC):
         facts = {
             cs_ref,
             Flag('db', 'tx'),
+            Value('db', 'created', str(datetime.datetime.now())),
             Value('db', 'txclient', changeset.client),
             Value('db', 'txcreated', str(changeset.created)),
             Content(content),

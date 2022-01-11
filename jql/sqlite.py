@@ -7,7 +7,7 @@ from typing import FrozenSet, List, Iterable, Set, Optional, Tuple
 
 from jql.changeset import Change, ChangeSet
 from jql.db import Store
-from jql.types import Fact, Flag, Item, Ref, Value, is_tag, is_flag, is_content, get_ref, has_value, Tag, fact_from_dict
+from jql.types import Fact, Flag, Item, Ref, Value, is_tag, is_flag, is_content, get_ref, has_value, Tag, fact_from_dict, has_flag
 
 
 class SqliteStore(Store):
@@ -112,6 +112,16 @@ class SqliteStore(Store):
             ''')
 
             cur.execute('''PRAGMA user_version = 6''')
+
+        if current_version < 7:
+            # Backfill missing created props
+            for i in cur.execute('''SELECT ref, created FROM idlist'''):
+                ref = Ref(i[0])
+                item = self._get_item(ref)
+                if not has_flag(item, 'db', 'created'):
+                    self._update_item(ref, {Value('db', 'created', i[1])})
+
+            cur.execute('''PRAGMA user_version = 7''')
 
         # Look for existing salt
         cur.execute("SELECT val FROM config WHERE key='salt'")
