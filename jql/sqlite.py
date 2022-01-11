@@ -77,6 +77,27 @@ class SqliteStore(Store):
 
             cur.execute('''PRAGMA user_version = 4''')
 
+        if current_version < 5:
+            # Migrate changes into changeset table
+            cur.execute('''ALTER TABLE changesets ADD COLUMN changes text''')
+
+            for cs in cur.execute('SELECT rowid FROM changesets ORDER BY rowid'):
+                # Get changes
+                changes = []
+                for c in cur.execute('SELECT rowid, ref, uuid, revoke, facts FROM changes WHERE changeset = ?', (cs[0],)):
+                    changes.append({
+                        'ref': c[1],
+                        'uid': c[2],
+                        'revoke': c[3],
+                        'facts': json.loads(c[4])
+                    })
+
+                changes_json = json.dumps(changes)
+                cur.execute('UPDATE changesets SET changes = ? WHERE rowid = ?', (changes_json, cs[0]))
+
+            cur.execute('''DROP TABLE changes''')
+            cur.execute('''PRAGMA user_version = 5''')
+
         # Look for existing salt
         cur.execute("SELECT val FROM config WHERE key='salt'")
         existing_salt = cur.fetchone()
@@ -291,24 +312,13 @@ class SqliteStore(Store):
 
     def _record_changeset(self, changeset: ChangeSet) -> str:
         cur = self._conn.cursor()
-        cur.execute('INSERT INTO changesets (uuid, client, created, query) VALUES (?, ?, ?, ?)', (changeset.uuid, changeset.client, changeset.created, changeset.query))
-        changeset_id = int(cur.lastrowid)
-
-        values = []
-        for c in changeset.changes:
-            ref = c.ref.value if c.ref else ''
-            uid = c.uid if c.uid else ''
-            facts = json.dumps([f._asdict() for f in c.facts])
-            values.append((changeset_id, ref, uid, facts, c.revoke))
-
-        cur.executemany('INSERT INTO changes (changeset, ref, uuid, facts, revoke) VALUES (?, ?, ?, ?, ?)', values)
+        cur.execute('INSERT INTO changesets (uuid, client, created, query, changes) VALUES (?, ?, ?, ?, ?)', (changeset.uuid, changeset.client, changeset.created, changeset.query, json.dumps(changeset.changes_as_dict())))
         self._conn.commit()
-
         return changeset.uuid
 
     def _load_changeset(self, changeset_uuid: str) -> ChangeSet:
         cur = self._conn.cursor()
-        cur.execute('SELECT rowid, client, created, query FROM changesets WHERE uuid = ?', (changeset_uuid,))
+        cur.execute('SELECT rowid, client, created, query, changes FROM changesets WHERE uuid = ?', (changeset_uuid,))
         cs = cur.fetchone()
         if not cs:
             raise Exception(f'Could not find changeset {changeset_uuid}')
@@ -321,20 +331,18 @@ class SqliteStore(Store):
             changes=[]
         )
 
-        for c in cur.execute('SELECT rowid, ref, uuid, revoke, facts FROM changes WHERE changeset = ?', (cs[0],)):
-            ref = Ref(c[1]) if c[1] else None
-            uid = c[2] if c[2] else None
-            revoke = c[3]
-            facts = set([fact_from_dict(fact) for fact in json.loads(c[4])])
+        for c in json.loads(cs[4]):
+            ref = Ref(c['ref']) if c['ref'] else None
+            uid = c['uid'] if c['uid'] else None
+            revoke = c['revoke']
+            facts = {fact_from_dict(fact) for fact in c['facts']}
 
-            change = Change(
+            changeset.changes.append(Change(
                 ref=ref,
                 uid=uid,
                 facts=facts,
                 revoke=revoke
-            )
-
-            changeset.changes.append(change)
+            ))
 
         return changeset
 
