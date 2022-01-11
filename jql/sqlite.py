@@ -49,6 +49,34 @@ class SqliteStore(Store):
             cur.execute('''UPDATE idlist SET archived = 0, created = date('now')''')
             cur.execute('''PRAGMA user_version = 3''')
 
+        if current_version < 4:
+            # Add some views to make queries easier to write
+            cur.execute('''
+                        CREATE VIEW current_facts
+                        AS
+                        SELECT i.ref, f.dbid, f.tag, f.prop, f.val, i.archived, i.created
+                          FROM facts f
+                         INNER JOIN idlist i
+                            ON i.rowid = f.dbid
+                         WHERE i.changeset_uuid IS NULL
+                           AND f.current = 1
+                           AND f.revoke = 0
+            ''')
+            cur.execute('''
+                        CREATE VIEW current_items
+                        AS
+                        SELECT i.ref, f.dbid, f.tag, f.prop, f.val, i.created
+                          FROM facts f
+                         INNER JOIN idlist i
+                            ON i.rowid = f.dbid
+                         WHERE i.changeset_uuid IS NULL
+                           AND i.archived = 0
+                           AND f.current = 1
+                           AND f.revoke = 0
+            ''')
+
+            cur.execute('''PRAGMA user_version = 4''')
+
         # Look for existing salt
         cur.execute("SELECT val FROM config WHERE key='salt'")
         existing_salt = cur.fetchone()
@@ -131,23 +159,18 @@ class SqliteStore(Store):
             else:
                 raise Exception(f'Unexpected search token {fact}')
 
-            where.append(f" INNER JOIN facts AS {prefix} ON i.rowid = {prefix}.dbid AND {prefix}.current = 1 AND {prefix}.revoke = 0 AND {w} ")
+            where.append(f" INNER JOIN current_items AS {prefix} ON c.dbid = {prefix}.dbid AND {w} ")
 
         cur = self._conn.cursor()
         items_sql = '''
-        SELECT f.dbid, f.tag, f.prop, f.val
-        FROM facts f
-        INNER JOIN idlist i
-        ON i.rowid = f.dbid
-        AND i.changeset_uuid IS NULL
-        AND i.archived = 0
+        SELECT c.dbid, c.tag, c.prop, c.val
+        FROM current_items c
         '''
         for w in where:
             items_sql += w
 
         items_sql += '''
-        WHERE f.current = 1 AND f.revoke = 0
-        ORDER BY i.created
+        ORDER BY c.created
         '''
 
         facts = {}  # type: ignore
@@ -220,24 +243,19 @@ class SqliteStore(Store):
 
         cur = self._conn.cursor()
         tags_sql = '''
-            SELECT f.tag, COUNT(DISTINCT f.dbid)
-            FROM facts f
-            INNER JOIN idlist i
-            ON i.rowid = f.dbid
-            AND i.changeset_uuid IS NULL
-            WHERE f.revoke = 0 AND f.current = 1
+            SELECT tag, COUNT(DISTINCT dbid)
+            FROM current_items
         '''
 
         if len(prefix):
-            tags_sql += ' AND f.tag LIKE ? '
+            tags_sql += ' WHERE tag LIKE ? '
             params = [f'{prefix}%']
         else:
             params = []
 
         tags_sql += '''
-            AND i.archived = 0
-            GROUP BY f.tag
-            ORDER BY f.tag
+            GROUP BY tag
+            ORDER BY tag
         '''
 
         for row in cur.execute(tags_sql, params):
@@ -250,25 +268,20 @@ class SqliteStore(Store):
 
         cur = self._conn.cursor()
         props_sql = '''
-            SELECT f.prop, COUNT(DISTINCT f.dbid)
-            FROM facts f
-            INNER JOIN idlist i
-            ON i.rowid = f.dbid
-            AND i.changeset_uuid IS NULL
-            WHERE f.revoke = 0 AND f.current = 1
-            AND f.tag = ? AND f.prop != ""
+            SELECT prop, COUNT(DISTINCT dbid)
+            FROM current_items
+            WHERE tag = ? AND prop != ""
         '''
 
         if len(prefix):
-            props_sql += ' AND f.prop LIKE ? '
+            props_sql += ' AND prop LIKE ? '
             params = [tag, f'{prefix}%']
         else:
             params = [tag]
 
         props_sql += '''
-            AND i.archived = 0
-            GROUP BY f.prop
-            ORDER BY f.prop
+            GROUP BY prop
+            ORDER BY prop
         '''
 
         for row in cur.execute(props_sql, params):
