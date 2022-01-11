@@ -98,6 +98,21 @@ class SqliteStore(Store):
             cur.execute('''DROP TABLE changes''')
             cur.execute('''PRAGMA user_version = 5''')
 
+        if current_version < 6:
+            # Add another view to make queries easier to write
+            cur.execute('''
+                        CREATE VIEW current_facts_inc_tx
+                        AS
+                        SELECT i.ref, f.dbid, f.tag, f.prop, f.val, i.archived, i.created
+                          FROM facts f
+                         INNER JOIN idlist i
+                            ON i.rowid = f.dbid
+                         WHERE f.current = 1
+                           AND f.revoke = 0
+            ''')
+
+            cur.execute('''PRAGMA user_version = 6''')
+
         # Look for existing salt
         cur.execute("SELECT val FROM config WHERE key='salt'")
         existing_salt = cur.fetchone()
@@ -144,7 +159,7 @@ class SqliteStore(Store):
     def _get_item(self, ref: Fact) -> Optional[Item]:
         cur = self._conn.cursor()
         facts: Set[Fact] = set()
-        for row in cur.execute('SELECT f.tag, f.prop, f.val FROM facts f INNER JOIN idlist i ON i.rowid = f.dbid WHERE f.current = 1 AND f.revoke = 0 AND i.ref = ?', [ref.value]):
+        for row in cur.execute('SELECT tag, prop, val FROM current_facts_inc_tx WHERE ref = ?', [ref.value]):
             facts.add(Fact(row[0], row[1], row[2]))
         if len(facts) == 0:
             return None
