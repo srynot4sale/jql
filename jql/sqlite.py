@@ -118,7 +118,7 @@ class SqliteStore(Store):
             for i in cur.execute('''SELECT ref, created FROM idlist'''):
                 ref = Ref(i[0])
                 item = self._get_item(ref)
-                if not has_flag(item, 'db', 'created'):
+                if item and not has_flag(item, 'db', 'created'):
                     self._update_item(ref, {Value('db', 'created', i[1])})
 
             cur.execute('''PRAGMA user_version = 7''')
