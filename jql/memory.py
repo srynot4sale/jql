@@ -54,11 +54,11 @@ class MemoryStore(Store):
                 matches.append(item)
         return matches
 
-    def _create_item(self, item: Item) -> Item:
+    def _create_item(self, changeset_ref: Fact, item: Item) -> Item:
         self._items[get_ref(item).value] = item
         return item
 
-    def _update_item(self, ref: Fact, new_facts: Set[Fact]) -> Item:
+    def _update_item(self, changeset_ref: Fact, ref: Fact, new_facts: Set[Fact]) -> Item:
         item = self._get_item(ref)
         if not item:
             raise Exception("Could not find item being updated")
@@ -68,7 +68,7 @@ class MemoryStore(Store):
             self._reflist[self.ref_to_id(ref)].archived = True
         return updated_item
 
-    def _revoke_item_facts(self, ref: Fact, revoke: Set[Fact]) -> Item:
+    def _revoke_item_facts(self, changeset_ref: Fact, ref: Fact, revoke: Set[Fact]) -> Item:
         item = self._get_item(ref)
         if not item:
             raise Exception("Could not find item being updated")

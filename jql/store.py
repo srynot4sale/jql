@@ -7,7 +7,7 @@ from typing import List, Optional, Iterable, Set, Tuple
 import uuid
 
 
-from jql.types import Content, Fact, Flag, get_created_time, Item, is_ref, Ref, Value
+from jql.types import Content, Fact, Flag, get_created_time, Item, is_ref, Ref, Tag, Value
 from jql.changeset import ChangeSet
 
 
@@ -48,30 +48,32 @@ class Store(ABC):
             cs_ref,
             Flag('db', 'tx'),
             Value('db', 'created', str(datetime.datetime.now())),
-            Value('db', 'txclient', changeset.client),
-            Value('db', 'txcreated', str(changeset.created)),
+            Tag('tx'),
+            Value('tx', 'client', changeset.client),
+            Value('tx', 'created', str(changeset.created)),
+            Value('tx', 'uuid', str(changeset.uuid)),
             Content(content),
         }
 
         if changeset.query:
-            facts.add(Value('db', 'txquery', changeset.query))
+            facts.add(Value('tx', 'query', changeset.query))
 
         cs = Item(facts=facts)
-        self._create_item(cs)
+        self._create_item(cs_ref, cs)
 
         resp: List[Item] = []
         for change in changeset.changes:
             # create change
             if change.ref:
                 if change.revoke:
-                    resp.append(self._revoke_item_facts(change.ref, change.facts))
+                    resp.append(self._revoke_item_facts(cs_ref, change.ref, change.facts))
                 else:
-                    resp.append(self._update_item(change.ref, change.facts))
+                    resp.append(self._update_item(cs_ref, change.ref, change.facts))
             elif change.uid:
                 created = get_created_time(iter(change.facts))
                 new_ref, _ = self._next_ref(change.uid, created=created.value)
                 new_item = Item(facts=frozenset(change.facts.union({new_ref})))
-                resp.append(self._create_item(new_item))
+                resp.append(self._create_item(cs_ref, new_item))
             else:
                 raise Exception("Unexpected Change format")
         return resp
@@ -99,15 +101,15 @@ class Store(ABC):
         pass
 
     @abstractmethod
-    def _create_item(self, item: Item) -> Item:
+    def _create_item(self, changeset_ref: Fact, item: Item) -> Item:
         pass
 
     @abstractmethod
-    def _update_item(self, ref: Fact, new_facts: Set[Fact]) -> Item:
+    def _update_item(self, changeset_ref: Fact, ref: Fact, new_facts: Set[Fact]) -> Item:
         pass
 
     @abstractmethod
-    def _revoke_item_facts(self, ref: Fact, revoke: Set[Fact]) -> Item:
+    def _revoke_item_facts(self, changeset_ref: Fact, ref: Fact, revoke: Set[Fact]) -> Item:
         pass
 
     @abstractmethod

@@ -7,7 +7,7 @@ from typing import FrozenSet, List, Iterable, Set, Optional, Tuple
 
 from jql.changeset import Change, ChangeSet
 from jql.store import Store
-from jql.types import Fact, Flag, Item, Ref, Value, is_tag, is_flag, is_content, get_ref, has_value, Tag, fact_from_dict, has_flag
+from jql.types import Fact, Flag, Item, Ref, Value, is_tag, is_flag, is_content, get_ref, has_value, Tag, fact_from_dict
 
 
 class SqliteStore(Store):
@@ -115,13 +115,80 @@ class SqliteStore(Store):
 
         if current_version < 7:
             # Backfill missing created props
-            for i in cur.execute('''SELECT ref, created FROM idlist'''):
-                ref = Ref(i[0])
-                item = self._get_item(ref)
-                if item and not has_flag(item, 'db', 'created'):
-                    self._update_item(ref, {Value('db', 'created', i[1])})
-
+            # Removed due to incompatible code change
             cur.execute('''PRAGMA user_version = 7''')
+
+        if current_version < 8:
+            # View improvements
+            cur.execute('''
+                        CREATE VIEW items
+                        AS
+                        SELECT rowid, ref, uuid, archived, created
+                          FROM idlist
+                         WHERE changeset_uuid IS NULL
+            ''')
+            cur.execute('''DROP VIEW IF EXISTS current_items''')
+            cur.execute('''
+                        CREATE VIEW current_items
+                        AS
+                        SELECT rowid, ref, uuid, created
+                          FROM items
+                         WHERE archived = 0
+            ''')
+            cur.execute('''
+                        CREATE VIEW transactions
+                        AS
+                        SELECT rowid, ref, changeset_uuid AS uuid, archived, created
+                          FROM idlist
+                         WHERE uuid IS NULL
+            ''')
+            cur.execute('''DROP VIEW IF EXISTS current_facts_inc_tx''')
+            cur.execute('''
+                        CREATE VIEW current_facts_inc_tx
+                        AS
+                        SELECT i.ref, f.dbid, f.tag, f.prop, f.val, t.ref as tx_ref, i.archived, i.created, CASE WHEN i.changeset_uuid IS NOT NULL THEN 1 ELSE 0 END AS is_tx
+                          FROM facts f
+                         INNER JOIN idlist i
+                            ON i.rowid = f.dbid
+                         INNER JOIN transactions t
+                            ON t.rowid = f.changeset
+                         WHERE f.current = 1
+                           AND f.revoke = 0
+            ''')
+            cur.execute('''
+                        CREATE VIEW current_facts_inc_archived
+                        AS
+                        SELECT ref, dbid, tag, prop, val, tx_ref, archived, created
+                          FROM current_facts_inc_tx
+                         WHERE is_tx = 0
+            ''')
+            cur.execute('''DROP VIEW IF EXISTS current_facts''')
+            cur.execute('''
+                        CREATE VIEW current_facts
+                        AS
+                        SELECT ref, dbid, tag, prop, val, tx_ref, created
+                          FROM current_facts_inc_archived
+                         WHERE archived = 0
+            ''')
+            cur.execute('''
+                        CREATE TRIGGER archive_overriden_facts
+                        AFTER INSERT
+                         ON facts
+                        FOR EACH ROW
+                        WHEN
+                          1 NOT IN (SELECT COUNT(rowid) FROM facts WHERE current = 1 AND dbid = new.dbid AND tag = new.tag AND prop = new.prop)
+                        BEGIN
+                            UPDATE facts
+                            SET current = 0
+                            WHERE dbid = new.dbid
+                              AND rowid != new.rowid
+                              AND current = 1
+                              AND tag = new.tag
+                              AND prop = new.prop;
+                        END
+            ''')
+
+            cur.execute('''PRAGMA user_version = 8''')
 
         # Look for existing salt
         cur.execute("SELECT val FROM config WHERE key='salt'")
@@ -169,8 +236,8 @@ class SqliteStore(Store):
     def _get_item(self, ref: Fact) -> Optional[Item]:
         cur = self._conn.cursor()
         facts: Set[Fact] = set()
-        for row in cur.execute('SELECT tag, prop, val FROM current_facts_inc_tx WHERE ref = ?', [ref.value]):
-            facts.add(Fact(row[0], row[1], row[2]))
+        for row in cur.execute('SELECT tag, prop, val, tx_ref FROM current_facts_inc_tx WHERE ref = ?', [ref.value]):
+            facts.add(Fact(tag=row[0], prop=row[1], value=row[2], tx=row[3]))
         if len(facts) == 0:
             return None
         return Item(facts=facts)
@@ -205,12 +272,12 @@ class SqliteStore(Store):
             else:
                 raise Exception(f'Unexpected search token {fact}')
 
-            where.append(f" INNER JOIN current_items AS {prefix} ON c.dbid = {prefix}.dbid AND {w} ")
+            where.append(f" INNER JOIN current_facts AS {prefix} ON c.dbid = {prefix}.dbid AND {w} ")
 
         cur = self._conn.cursor()
         items_sql = '''
-        SELECT c.dbid, c.tag, c.prop, c.val
-        FROM current_items c
+        SELECT c.dbid, c.tag, c.prop, c.val, c.tx_ref
+        FROM current_facts c
         '''
         for w in where:
             items_sql += w
@@ -225,34 +292,35 @@ class SqliteStore(Store):
                 if len(facts) >= 100:
                     break
                 facts[row[0]] = set()
-            facts[row[0]].add(Fact(row[1], row[2], row[3]))
+            facts[row[0]].add(Fact(tag=row[1], prop=row[2], value=row[3], tx=row[4]))
 
         for fs in facts.values():
             matches.append(Item(facts=fs))
 
         return matches
 
-    def _create_item(self, item: Item) -> Item:
-        self._add_facts(get_ref(item), item.facts, create=True)
+    def _create_item(self, changeset_ref: Fact, item: Item) -> Item:
+        self._add_facts(changeset_ref, get_ref(item), item.facts, create=True)
         return item
 
-    def _update_item(self, ref: Fact, new_facts: Set[Fact]) -> Item:
-        self._add_facts(ref, frozenset(new_facts))
+    def _update_item(self, changeset_ref: Fact, ref: Fact, new_facts: Set[Fact]) -> Item:
+        self._add_facts(changeset_ref, ref, frozenset(new_facts))
         updated_item = self._get_item(ref)
         if not updated_item:
             raise Exception("Updated item not found")
         return updated_item
 
-    def _revoke_item_facts(self, ref: Fact, revoke: Set[Fact]) -> Item:
-        self._add_facts(ref, frozenset(revoke), revoke=True)
+    def _revoke_item_facts(self, changeset_ref: Fact, ref: Fact, revoke: Set[Fact]) -> Item:
+        self._add_facts(changeset_ref, ref, frozenset(revoke), revoke=True)
         updated_item = self._get_item(ref)
         if not updated_item:
             raise Exception("Updated item not found")
         return updated_item
 
-    def _add_facts(self, ref: Fact, facts: FrozenSet[Fact], revoke: bool = False, create: bool = False) -> None:
+    def _add_facts(self, changeset_ref: Fact, ref: Fact, facts: FrozenSet[Fact], revoke: bool = False, create: bool = False) -> None:
         cur = self._conn.cursor()
         dbid, archived = cur.execute("SELECT rowid, archived FROM idlist WHERE ref=?", (ref.value,)).fetchone()
+        csid, = cur.execute("SELECT rowid FROM transactions WHERE ref=?", (changeset_ref.value,)).fetchone()
         values = []
 
         archive_changed = None
@@ -260,23 +328,9 @@ class SqliteStore(Store):
             if f.tag == "db" and f.prop == "archived":
                 archive_changed = not revoke
 
-            values.append((dbid, f.tag, f.prop, f.value, revoke))
+            values.append((csid, dbid, f.tag, f.prop, f.value, revoke))
 
-        cur.executemany('INSERT INTO facts (dbid, tag, prop, val, revoke, current) VALUES (?, ?, ?, ?, ?, 1)', values)
-
-        if not create:
-            # Calculate no longer current facts
-            cur.execute('''
-                UPDATE facts
-                SET current = 0
-                WHERE dbid = ?
-                AND rowid NOT IN (
-                    SELECT MAX(rowid)
-                    FROM facts
-                    WHERE dbid = ?
-                    GROUP BY tag, prop
-                )
-            ''', [dbid, dbid])
+        cur.executemany('INSERT INTO facts (changeset, dbid, tag, prop, val, revoke, current) VALUES (?, ?, ?, ?, ?, ?, 1)', values)
 
         # Calculate if we need to change the archived state
         if archive_changed is not None and archive_changed != archived:
@@ -290,7 +344,7 @@ class SqliteStore(Store):
         cur = self._conn.cursor()
         tags_sql = '''
             SELECT tag, COUNT(DISTINCT dbid)
-            FROM current_items
+            FROM current_facts
         '''
 
         if len(prefix):
@@ -315,7 +369,7 @@ class SqliteStore(Store):
         cur = self._conn.cursor()
         props_sql = '''
             SELECT prop, COUNT(DISTINCT dbid)
-            FROM current_items
+            FROM current_facts
             WHERE tag = ? AND prop != ""
         '''
 
@@ -375,16 +429,16 @@ class SqliteStore(Store):
         cur = self._conn.cursor()
 
         cs_sql = '''
-            SELECT f.dbid, f.tag, f.prop, f.val
-            FROM facts f
-            WHERE f.dbid IN (
+            SELECT dbid, tag, prop, val
+            FROM current_facts_inc_tx
+            WHERE is_tx = 1
+              AND rowid IN (
                 SELECT i.rowid
-                FROM idlist i
-                WHERE i.uuid IS NULL
+                FROM transactions i
                 ORDER BY i.rowid DESC
                 LIMIT 100
             )
-            ORDER BY f.rowid DESC, f.dbid DESC
+            ORDER BY rowid DESC, dbid DESC
         '''
 
         sets: List[Item] = []

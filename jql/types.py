@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Any, Callable, Iterable, Iterator, NamedTuple
+from typing import Any, Callable, Iterable, Iterator, NamedTuple, Optional
 
 
 class ItemException(Exception):
@@ -12,6 +12,7 @@ class Fact(NamedTuple):
     tag: str
     prop: str
     value: str
+    tx: Optional[str] = None
 
     def __str__(self) -> str:
         if is_tag(self):
@@ -47,6 +48,12 @@ class Fact(NamedTuple):
 
     def as_tuple(self) -> tuple[str, str, str]:
         return (self.tag, self.prop, self.value)
+
+    def __eq__(self, other: Any) -> bool:
+        return str(self) == str(other)
+
+    def __hash__(self) -> int:
+        return hash(self.as_tuple())
 
 
 Facts = Iterable[Fact]
