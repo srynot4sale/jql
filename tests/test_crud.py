@@ -1,4 +1,4 @@
-from jql.db import Store
+from jql.store import Store
 from generator import yamltest
 
 

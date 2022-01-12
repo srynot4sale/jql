@@ -6,7 +6,7 @@ import uuid
 
 if TYPE_CHECKING:
     from jql.client import Client
-    from jql.db import Store
+    from jql.store import Store
 
 from jql.parser import jql_parser, JqlTransformer
 from jql.types import Item, Fact, is_ref, has_flag, Value

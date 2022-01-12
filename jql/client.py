@@ -4,7 +4,7 @@ from structlog.stdlib import LoggerFactory
 import sys
 from typing import List
 
-from jql.db import Store
+from jql.store import Store
 from jql.types import Item
 from jql.transaction import Transaction
 

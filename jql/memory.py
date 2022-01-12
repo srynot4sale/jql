@@ -3,7 +3,7 @@ from typing import Dict, List, Iterable, Set, Optional, Tuple
 
 
 from jql.changeset import ChangeSet
-from jql.db import Store
+from jql.store import Store
 from jql.types import Fact, Flag, Item, is_archived, is_content, is_tag, is_tx, is_flag, is_ref, has_value, get_content, get_ref, get_tags, get_props, get_flags, Tag, revoke_item_facts, update_item, Value
 
 

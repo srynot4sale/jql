@@ -6,7 +6,7 @@ from typing import FrozenSet, List, Iterable, Set, Optional, Tuple
 
 
 from jql.changeset import Change, ChangeSet
-from jql.db import Store
+from jql.store import Store
 from jql.types import Fact, Flag, Item, Ref, Value, is_tag, is_flag, is_content, get_ref, has_value, Tag, fact_from_dict, has_flag
 
 
