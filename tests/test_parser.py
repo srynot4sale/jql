@@ -1,4 +1,5 @@
 import pytest
+from typing import Any, List
 
 from jql.parser import jql_parser, JqlTransformer
 from jql.types import Content, Flag, Ref, Tag, Value
@@ -56,6 +57,11 @@ examples = [
         [Ref("544"), Tag("book"), Tag("todo")]
     ],
     [
+        "@a4f SET #f1 #trapped",
+        "set",
+        [Ref("a4f"), Tag("f1"), Tag("trapped")]
+    ],
+    [
         "@4af DEL #book",
         "del",
         [Ref("4af"), Tag("book")]
@@ -98,8 +104,23 @@ examples = [
 ]
 
 
+failure_examples = [
+    # tags can't start with a number
+    '@aaa SET #1f',
+    # tags can't be uppercase
+    '@aaa SET #FFF',
+    # tags can't contain underscores
+    '@aaa SET #f_f',
+    # props can't be uppercase
+    '@aaa SET #fine/NOTFINE',
+    # props can't start with a number or underscore
+    '@aaa SET #fine/1notfine',
+    '@aaa SET #fine/_notfine',
+]
+
+
 @pytest.mark.parametrize("test", examples)
-def test_parser(test) -> None:
+def test_parser(test: List[Any]) -> None:
     query, action, result = test
 
     tree = jql_parser.parse(query)
@@ -107,3 +128,10 @@ def test_parser(test) -> None:
 
     assert ast.data == action
     assert ast.children == result
+
+
+@pytest.mark.parametrize("test", failure_examples)
+def test_parser_fails(test: str) -> None:
+
+    with pytest.raises(Exception):
+        jql_parser.parse(test)

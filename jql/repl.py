@@ -32,7 +32,7 @@ print('q to quit, h for help')
 print(f"Logged in to '{store_path}' as {client.user}, with client {client.name}")
 
 
-class JqlCompleter(Completer):
+class JqlCompleter(Completer):  # type: ignore
     actions = ["CREATE", "SET", "GET", "HINTS", "HISTORY", "LIST", "QUIT", "CHANGESETS"]
     _FIND_WORD_RE = re.compile(r"([a-zA-Z0-9_@#=\/]+)")
 

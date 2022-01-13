@@ -12,7 +12,7 @@ mypy --follow-imports skip -p jql
 
 echo
 echo "Running pytest..."
-coverage run -m pytest tests/
+coverage run --omit 'vendor/*' -m pytest tests/
 
 echo
 echo "Pytest coverage..."

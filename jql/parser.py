@@ -1,6 +1,6 @@
 from typing import List, Tuple
 
-from lark import Lark, Transformer, Token, Tree
+from lark import Lark, Transformer, Token, Tree  # type: ignore
 
 from jql.types import Fact, Ref, Tag, Flag, Value, Content
 
@@ -30,22 +30,23 @@ jql_parser = Lark(r"""
           | content data*
 
     id      : "@" ID
-    tag     : "#" WORD
-    fact    : tag "/" CNAME
+    tag     : "#" TAG
+    fact    : tag "/" PROP
     value   : fact "=" /[^ ]+/
     content : /[^#]+/
 
     ID      : HEXDIGIT+
     HEXDIGIT: "a".."f"|DIGIT
-    %import common.WORD
-    %import common.CNAME
+    TAG     : (LCASE_LETTER) (LCASE_LETTER|DIGIT)*
+    PROP    : (LCASE_LETTER) ("_"|LCASE_LETTER|DIGIT)*
+    %import common.LCASE_LETTER
     %import common.DIGIT
     %import common.WS
     %ignore WS
     """, start='action')
 
 
-class JqlTransformer(Transformer[Tree]):
+class JqlTransformer(Transformer[Tree]):  # type: ignore
     def id(self, i: List[Token]) -> Fact:
         return Ref(i[0].value)
 

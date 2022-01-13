@@ -127,7 +127,7 @@ class Transaction:
         tree = jql_parser.parse(query)
         ast = JqlTransformer().transform(tree)
         action = ast.data
-        values: List[Fact] = [c for c in ast.children if isinstance(c, Fact)]  # type: ignore
+        values: List[Fact] = [c for c in ast.children if isinstance(c, Fact)]
 
         if action == 'create':
             self.create_item(values)
