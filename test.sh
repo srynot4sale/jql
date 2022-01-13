@@ -4,11 +4,11 @@ set -o nounset
 set -o pipefail
 
 echo "Running flake8..."
-flake8
+flake8 --extend-exclude 'vendor'
 
 echo
 echo "Running mypy..."
-mypy -p jql
+mypy --follow-imports skip -p jql
 
 echo
 echo "Running pytest..."

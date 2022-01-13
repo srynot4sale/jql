@@ -6,13 +6,13 @@ RUN apt-get update && \
     apt-get upgrade -y && \
     apt-get install -y python3-pip python3-dev
 
-ENV PYTHONPATH="/code/:${PYTHONPATH}"
+ENV PYTHONPATH="/code/:/code/vendor/:${PYTHONPATH}"
+ENV MYPYPATH="/code/:/code/vendor/"
 ENV DEBUG=1
 
 RUN mkdir /code
 WORKDIR /code
 
-ADD requirements.txt /tmp/
 ADD requirements-test.txt /tmp/
 
 RUN pip install --upgrade pip
@@ -21,6 +21,8 @@ RUN pip install -r /tmp/requirements-test.txt
 CMD ["/code/test.sh"]
 
 COPY setup.cfg /code/
+COPY setup.py /code/
 COPY jql/ /code/jql
+COPY vendor/ /code/vendor
 COPY tests/ /code/tests
 COPY test.sh /code/

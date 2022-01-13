@@ -13,6 +13,10 @@ help:
 build: ## Build api image
 	docker-compose -f docker-compose.test.yml build
 
+.PHONY: vendorize
+vendorize: ## Update vendorized dependencies
+	pip3 install --isolated --upgrade -t ./vendor -r requirements.txt
+
 .PHONY: venv
 venv: ## Update virtualenv
 	virtualenv -p $$(which python3.8) venv
@@ -29,7 +33,7 @@ test: ## Run tests
 
 .PHONY: lint
 lint: ## Lint code
-	venv/bin/flake8
+	venv/bin/flake8 --extend-exclude 'vendor'
 	venv/bin/mypy -p jql
 
 
@@ -37,7 +41,7 @@ lint: ## Lint code
 
 .PHONY: repl
 repl: ## Run REPL
-	venv/bin/python -m jql.repl
+	PYTHONPATH="./vendor:${PYTHONPATH}" venv/bin/python -m jql.repl
 
 
 -include Makefile.local
