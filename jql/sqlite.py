@@ -190,6 +190,11 @@ class SqliteStore(Store):
 
             cur.execute('''PRAGMA user_version = 8''')
 
+        if current_version < 9:
+            # Backfill missing changeset ids
+            cur.execute('''UPDATE facts SET changeset = 1 WHERE changeset IS NULL''')
+            cur.execute('''PRAGMA user_version = 9''')
+
         # Look for existing salt
         cur.execute("SELECT val FROM config WHERE key='salt'")
         existing_salt = cur.fetchone()
