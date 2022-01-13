@@ -50,7 +50,9 @@ class Fact(NamedTuple):
         return (self.tag, self.prop, self.value)
 
     def __eq__(self, other: Any) -> bool:
-        return str(self) == str(other)
+        if not isinstance(other, self.__class__):
+            return False
+        return self.as_tuple() == other.as_tuple()
 
     def __hash__(self) -> int:
         return hash(self.as_tuple())
