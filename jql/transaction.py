@@ -1,7 +1,8 @@
 from __future__ import annotations
 import datetime
+import lark.exceptions
 import structlog
-from typing import Iterable, List, Optional, TYPE_CHECKING
+from typing import Iterable, List, Optional, Tuple, TYPE_CHECKING
 import uuid
 
 if TYPE_CHECKING:
@@ -9,7 +10,7 @@ if TYPE_CHECKING:
     from jql.store import Store
 
 from jql.parser import jql_parser, JqlTransformer
-from jql.types import Item, Fact, is_ref, has_flag, Value
+from jql.types import Item, Fact, is_ref, has_flag, Ref, Value
 from jql.changeset import Change, ChangeSet
 
 
@@ -123,16 +124,42 @@ class Transaction:
     def _get_items(self, search: Iterable[Fact]) -> List[Item]:
         return self._store.get_items(search)
 
-    def q(self, query: str) -> List[Item]:
-        self.start()
+    def query_to_tree(self, query: str, log_errors: bool = True, replacements: Optional[List[Tuple[int, str]]] = None) -> Tuple[str, List[Fact]]:
+        self.log = self.log.bind(query=query)
+        try:
+            tree = jql_parser.parse(query)
+        except lark.exceptions.UnexpectedInput as e:
+            err = str(e).splitlines()[0]
+            if log_errors:
+                self.log.error(err)
+            raise Exception(f'Query error: {err}')
 
+        ast = JqlTransformer().transform(tree)
+        values: List[Fact] = [c for c in ast.children if isinstance(c, Fact)]
+
+        # Replace any shortcuts
+        if replacements:
+            for s, ref in replacements:
+                new_values = []
+                for v in values:
+                    if v == Ref(str(s)):
+                        self.log.info(f'Replaced {s} with {ref}')
+                        new_values.append(Ref(ref))
+                    else:
+                        new_values.append(v)
+                values = new_values
+
+        return (ast.data, values)
+
+    def q(self, query: str, tree: Optional[Tuple[str, List[Fact]]] = None) -> List[Item]:
+        self.start()
         self.query = query
         self.log.msg(f"Query '{query}'")
-        self.log = self.log.bind(query=query)
-        tree = jql_parser.parse(query)
-        ast = JqlTransformer().transform(tree)
-        action = ast.data
-        values: List[Fact] = [c for c in ast.children if isinstance(c, Fact)]
+
+        if not tree:
+            tree = self.query_to_tree(query)
+
+        action, values = tree
 
         if action == 'create':
             self.create_item(values)

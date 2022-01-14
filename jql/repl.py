@@ -40,7 +40,14 @@ class JqlCompleter(Completer):  # type: ignore
         word = document.get_word_before_cursor(WORD=False, pattern=self._FIND_WORD_RE)
         if word.startswith('#'):
             tx = client.new_transaction()
-            response = tx.q(f'HINTS {word}' if len(word) > 1 else 'HINTS')
+            query = f'HINTS {word}' if len(word) > 1 else 'HINTS'
+            try:
+                tree = tx.query_to_tree(query, log_errors=False)
+            except BaseException:
+                return
+
+            response = tx.q(query, tree=tree)
+
             for r in response:
                 # Ignore system tags/facts
                 if not get_tags(r):
@@ -70,7 +77,9 @@ def render_item(item: Item, shortcut: Optional[int] = None) -> HTML:
     if has_ref(item):
         output += f' <skyblue><b>{get_ref(item)}</b></skyblue>'
 
-    output += f' {e(get_content(item))}'
+    content = get_content(item).value
+    if len(content):
+        output += f' {e(content)}'
 
     for p in get_tags(item):
         output += f' <green>{p}</green>'
@@ -94,14 +103,9 @@ while True:
             print('HELP!')
             continue
 
-        # Replace any shortcuts
-        for s, ref in shortcuts:
-            if f'@{s}' in i:
-                i = i.replace(f'@{s}', f'@{ref}')
-                print(HTML(f"<i>Replacing shortcut @{s} with @{ref}</i>"))
-
         tx = client.new_transaction()
-        response = tx.q(i)
+        tree = tx.query_to_tree(i, replacements=shortcuts)
+        response = tx.q(i, tree=tree)
 
         if tx.changeset:
             print(HTML("<b>Changes:</b>"))
@@ -117,11 +121,17 @@ while True:
             shortcuts = []
             for r in response:
                 shortcut = None
-                s = len(shortcuts)
-                if s < 10 and has_ref(r):
+                if has_ref(r):
                     ref = get_ref(r).value
-                    shortcuts.append((s, ref))
-                    shortcut = s
+                    for s, sref in shortcuts:
+                        if sref == ref:
+                            shortcut = s
+                            break
+
+                    s = len(shortcuts)
+                    if shortcut is None and s < 10:
+                        shortcuts.append((s, ref))
+                        shortcut = s
 
                 print(render_item(r, shortcut))
         print()
