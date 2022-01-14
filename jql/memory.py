@@ -131,3 +131,6 @@ class MemoryStore(Store):
 
     def _get_changesets_as_items(self) -> List[Item]:
         return []
+
+    def _get_history(self, ref: Optional[Fact] = None) -> List[Item]:
+        return []

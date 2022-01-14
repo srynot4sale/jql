@@ -7,7 +7,7 @@ from typing import FrozenSet, List, Iterable, Set, Optional, Tuple
 
 from jql.changeset import Change, ChangeSet
 from jql.store import Store
-from jql.types import Fact, Flag, Item, Ref, Value, is_tag, is_flag, is_content, get_ref, has_value, Tag, fact_from_dict
+from jql.types import Content, Fact, Flag, Item, Ref, Value, is_tag, is_flag, is_content, get_ref, has_value, Tag, fact_from_dict
 
 
 class SqliteStore(Store):
@@ -455,5 +455,58 @@ class SqliteStore(Store):
 
         for fs in facts.values():
             sets.append(Item(facts=fs))
+
+        return sets
+
+    def _get_history(self, ref: Optional[Fact] = None) -> List[Item]:
+        cur = self._conn.cursor()
+
+        cs_params = []
+        cs_sql = '''
+            SELECT i.ref, f.tag, f.prop, f.val, f.revoke, t.ref AS tx_ref, t.created AS tx_created
+            FROM facts f
+            INNER JOIN items i
+               ON i.rowid = f.dbid
+            INNER JOIN transactions t
+               ON t.rowid = f.changeset
+            WHERE
+        '''
+
+        if ref:
+            cs_sql += '''
+                i.ref = ?
+            '''
+            cs_params.append(ref.value)
+        else:
+            # Get last 100 transactions
+            cs_sql += '''
+                f.changeset IN (
+                    SELECT rowid
+                    FROM transactions
+                    ORDER BY rowid DESC
+                    LIMIT 100
+                )
+            '''
+
+        cs_sql += '''
+            AND f.dbid != f.changeset
+            ORDER BY f.rowid DESC, f.dbid ASC, f.changeset DESC
+        '''
+
+        sets: List[Item] = []
+        for row in cur.execute(cs_sql, cs_params):
+            if not ref:
+                desc = f'@{row[0]}: '
+            else:
+                desc = ''
+            desc += 'Added ' if not row[4] else 'Revoked '
+            desc += repr(Fact(row[1], row[2], row[3]))
+            facts = {
+                Ref(row[5]),
+                Content(desc),
+                Value('db', 'created', str(Ref(row[6])))
+            }
+
+            sets.append(Item(facts=facts))
 
         return sets

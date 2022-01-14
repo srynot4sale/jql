@@ -16,7 +16,7 @@ jql_parser = Lark(r"""
           | id                              -> get
           | data+                           -> list
           | content data*                   -> list
-          | id "HISTORY"                    -> history
+          | id? "HISTORY"                   -> history
 
     ?prop: tag "/"?
          | fact

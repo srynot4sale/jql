@@ -82,6 +82,11 @@ class Transaction:
         self.log.msg("tx.get_items()", search=search)
         self.add_response(self._get_items(search))
 
+    def get_history(self, search: Optional[Fact] = None) -> None:
+        self.start()
+        self.log.msg("tx.get_history()", search=search)
+        self.add_response(self._store._get_history(search))
+
     def get_hints(self, search: str = '') -> None:
         self.start()
         # self.log.msg("tx.get_hints()", search=search)
@@ -139,8 +144,12 @@ class Transaction:
             self.commit()
             return self.response
 
-        if action in ('get', 'history'):
+        if action == 'get':
             self.get_item(values[0])
+            return self.response
+
+        if action == 'history':
+            self.get_history(values[0] if values else None)
             return self.response
 
         if action == 'list':

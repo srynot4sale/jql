@@ -33,7 +33,7 @@ print(f"Logged in to '{store_path}' as {client.user}, with client {client.name}"
 
 
 class JqlCompleter(Completer):  # type: ignore
-    actions = ["CREATE", "SET", "GET", "HINTS", "HISTORY", "LIST", "QUIT", "CHANGESETS"]
+    actions = ["CREATE", "SET", "DEL", "HINTS", "HISTORY", "QUIT", "CHANGESETS"]
     _FIND_WORD_RE = re.compile(r"([a-zA-Z0-9_@#=\/]+)")
 
     def get_completions(self, document, complete_event):  # type: ignore

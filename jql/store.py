@@ -127,3 +127,7 @@ class Store(ABC):
     @abstractmethod
     def _get_changesets_as_items(self) -> List[Item]:
         pass
+
+    @abstractmethod
+    def _get_history(self, ref: Optional[Fact] = None) -> List[Item]:
+        pass
