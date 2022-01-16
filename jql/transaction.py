@@ -135,7 +135,7 @@ class Transaction:
             raise Exception(f'Query error: {err}')
 
         ast = JqlTransformer().transform(tree)
-        values: List[Fact] = [c for c in ast.children if isinstance(c, Fact)]
+        values: List[Fact] = [c for c in ast.children if isinstance(c, Fact)]  # type: ignore
 
         # Replace any shortcuts
         if replacements:

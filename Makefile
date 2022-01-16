@@ -21,19 +21,20 @@ vendorize: ## Update vendorized dependencies
 venv: ## Update virtualenv
 	virtualenv -p $$(which python3.8) venv
 	venv/bin/pip install --upgrade pip
+	venv/bin/pip install --upgrade -r requirements.txt
 	venv/bin/pip install --upgrade -r requirements-test.txt
 
 
 ## Test
 
 .PHONY: test
-test: ## Run tests
+test: lint ## Run tests
 	docker-compose -f docker-compose.test.yml build
 	docker-compose -f docker-compose.test.yml up jql
 
 .PHONY: lint
 lint: ## Lint code
-	venv/bin/flake8 --extend-exclude 'vendor'
+	venv/bin/flake8
 	venv/bin/mypy -p jql
 
 

@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from hashids import Hashids
+from hashids import Hashids  # type: ignore
 import datetime
 import json
 import string
