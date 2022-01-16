@@ -96,6 +96,9 @@ def render_item(item: Item, shortcut: Optional[int] = None) -> HTML:
 while True:
     try:
         i = session.prompt()
+        if not len(i):
+            continue
+
         if i in ("q", "Q", "QUIT"):
             raise EOFError
 
