@@ -42,7 +42,8 @@ lint: ## Lint code
 
 .PHONY: repl
 repl: ## Run REPL
-	PYTHONPATH="./vendor:${PYTHONPATH}" venv/bin/python -m jql.repl
+	docker build -f Dockerfile.repl -t jql-repl .
+	docker run --rm -ti -v jql-repl:/data jql-repl
 
 
 -include Makefile.local

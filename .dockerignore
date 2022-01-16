@@ -16,7 +16,7 @@ __pycache__/
 /.stfolder/
 /.stversions/
 
-Dockerfile.test
+Dockerfile.*
 docker-compose.test.yml
 Makefile
 /data/

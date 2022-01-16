@@ -1,0 +1,13 @@
+FROM python:3.8-slim
+
+MAINTAINER Aaron Barnes <aaron@io.nz>
+
+ENV PYTHONPATH="/code/:/code/vendor/:${PYTHONPATH}"
+
+RUN mkdir /code
+WORKDIR /code
+
+CMD ["python", "-m", "jql.repl", "/data/repl.jdb"]
+
+COPY vendor/ /code/vendor
+COPY jql/ /code/jql
