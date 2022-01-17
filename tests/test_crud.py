@@ -2,9 +2,6 @@ from jql.store import Store
 from generator import yamltest
 
 
-interface = "query"
-
-
 @yamltest
 def test_basic_create(db: Store) -> str:
     return '''
