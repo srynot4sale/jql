@@ -179,6 +179,10 @@ class Item:
 
         return ' '.join(output)
 
+    def __repr__(self) -> str:
+        facts = ', '.join(sorted([repr(f) for f in self.facts]))
+        return f'Item(facts={{{facts}}}'
+
     def as_tuples(self) -> set[tuple[str, str, str]]:
         props_tags = {Tag(f.tag) for f in get_props(self)}
         return {f.as_tuple() for f in self.facts if not is_primary_ref(f) and not is_created(f) and f not in props_tags}
