@@ -11,6 +11,9 @@ from jql.types import get_ref, Fact, Item, Ref
 from jql.transaction import Transaction
 
 
+pytest.register_assert_rewrite("generator")
+
+
 log = structlog.get_logger()
 
 Expected = Dict[str, Dict[str, Union[str, Literal[True]]]]

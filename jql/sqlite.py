@@ -14,9 +14,6 @@ class SqliteStore(Store):
     def __init__(self, location: str = ":memory:", salt: str = "") -> None:
         self._conn = sqlite3.connect(location)
 
-        if os.getenv("DEBUG") or os.getenv("FLASK_ENV") == "development":
-            self._conn.set_trace_callback(print)
-
         cur = self._conn.cursor()
         current_version = cur.execute('pragma user_version').fetchone()[0]
         if not current_version:
@@ -207,6 +204,9 @@ class SqliteStore(Store):
             cur.execute('INSERT INTO config (key, val) VALUES (?, ?)', ['created', datetime.datetime.now()])
 
         self._conn.commit()
+
+        if os.getenv("DEBUG") or os.getenv("FLASK_ENV") == "development":
+            self._conn.set_trace_callback(print)
 
     def _next_ref(self, uid: str, created: str, changeset: bool = False) -> Tuple[Fact, int]:
         cur = self._conn.cursor()
