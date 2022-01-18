@@ -124,7 +124,7 @@ class Transaction:
     def _get_items(self, search: Iterable[Fact]) -> List[Item]:
         return self._store.get_items(search)
 
-    def query_to_tree(self, query: str, log_errors: bool = True, replacements: Optional[List[Tuple[int, str]]] = None) -> Tuple[str, List[Fact]]:
+    def query_to_tree(self, query: str, log_errors: bool = True, replacements: Optional[List[Tuple[str, str]]] = None) -> Tuple[str, List[Fact]]:
         self.log = self.log.bind(query=query)
         try:
             tree = jql_parser.parse(query)

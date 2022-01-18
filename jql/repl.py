@@ -63,10 +63,10 @@ class JqlCompleter(Completer):
 
 session: PromptSession[str] = PromptSession('> ', completer=JqlCompleter(), auto_suggest=AutoSuggestFromHistory())
 
-shortcuts: List[Tuple[int, str]] = []
+shortcuts: List[Tuple[str, str]] = []
 
 
-def render_item(item: Item, shortcut: Optional[int] = None) -> HTML:
+def render_item(item: Item, shortcut: Optional[str] = None) -> HTML:
     output = ''
 
     if shortcut is not None:
@@ -131,10 +131,10 @@ while True:
                             shortcut = s
                             break
 
-                    s = len(shortcuts)
-                    if shortcut is None and s < 10:
-                        shortcuts.append((s, ref))
-                        shortcut = s
+                    slen = len(shortcuts)
+                    if shortcut is None and slen < 10:
+                        shortcuts.append((str(slen), ref))
+                        shortcut = str(slen)
 
                 print(render_item(r, shortcut))
         print()
