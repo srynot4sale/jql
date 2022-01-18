@@ -22,6 +22,7 @@ class MemoryStore(Store):
         self._changesets: Dict[str, ChangeSet] = {}
         self._items: Dict[str, Item] = {}
         self._reflist: Dict[int, MemoryRef] = {}
+        self._history: List[Tuple[str, Item]] = []
 
     def _get_item(self, ref: Fact) -> Optional[Item]:
         return self._items.get(ref.value, None)
@@ -130,7 +131,25 @@ class MemoryStore(Store):
         return self._changesets[changeset_uuid]
 
     def _get_changesets_as_items(self) -> List[Item]:
-        return []
+        matches = []
+        for _, item in reversed(self._items.items()):
+            if not is_tx(item):
+                continue
+
+            matches.append(item)
+            if len(matches) >= 100:
+                break
+
+        return matches
 
     def _get_history(self, ref: Optional[Fact] = None) -> List[Item]:
-        return []
+        res = []
+        for h in reversed(self._history):
+            if ref and h[0] != ref.value:
+                continue
+
+            res.append(h[1])
+            if len(res) >= 100:
+                break
+
+        return res

@@ -5,6 +5,7 @@ from typing import Dict, Generator, Iterator, List, Literal, Union
 
 
 from jql.client import Client
+from jql.store import Store
 from jql.memory import MemoryStore
 from jql.sqlite import SqliteStore
 from jql.types import get_ref, Fact, Item, Ref
@@ -21,6 +22,7 @@ Expected = Dict[str, Dict[str, Union[str, Literal[True]]]]
 
 class dbclass:
     client: Client
+    store: Store
     _tx: Transaction
     _last_resp: List[Item]
 
@@ -66,6 +68,7 @@ def db(request) -> Iterator[dbclass]:  # type: ignore
     # Delete all in db
     wrapper = dbclass()
     wrapper.client = client
+    wrapper.store = client.store
     yield wrapper
 
 

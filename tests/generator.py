@@ -1,8 +1,9 @@
+import re
 import yaml
-from typing import Any, Callable, Dict, Tuple
+from typing import Any, Callable, Dict, Set, Tuple
 
 
-from jql.types import Fact, Flag, Item, Tag
+from jql.types import Fact, Flag, Item, Tag, get_ref
 
 
 def make_item(result: Any) -> Item:
@@ -23,46 +24,70 @@ def make_item(result: Any) -> Item:
     return Item(facts=facts)
 
 
-def parse_refs(query: str, refs: Dict[str, Tuple[str, Item]]) -> str:
-    for r in refs:
-        query = query.replace(f'@{r}', refs[r][0])
-    return query
+def remove_variables_from_tuples(s: Set[Tuple[str, str, str]]) -> Set[Tuple[str, str, str]]:
+    rm = [
+        (r'@[a-f0-9]{6}', '??????'),  # @ref
+        (r'Ref\(\'[a-f0-9]{6}\'\)', 'Ref(\'??????\')'),  # Ref(ref)
+        (r'"ref"\: "[a-f0-9]{6}"', '"ref": "??????"'),  # "ref": "ref"
+        (r'[0-9]{4}\-[0-9]{2}\-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}', '????-??-??'),  # Datetime
+        (r'[a-f0-9]{8}\-[a-f0-9]{4}\-[a-f0-9]{4}\-[a-f0-9]{4}\-[a-f0-9]{12}', '????????'),  # uuid
+    ]
+
+    cleaned = set()
+    for t in s:
+        ct = []
+        for i in t:
+            for r in rm:
+                i = re.sub(r[0], r[1], i)
+            ct.append(i)
+
+        cleaned.add(tuple(ct))
+
+    return cleaned  # type: ignore
 
 
 def yamltest(func: Callable[[Any], str]) -> Callable[[Any], None]:
     def wrapper(db):  # type: ignore
         yml = func(db)
         testdef = yaml.safe_load(yml)
-
-        print(testdef)
+        if not testdef:
+            return
 
         refs: Dict[str, Tuple[str, Item]] = {}
         for step in testdef:
             query = step['q']
-            ref = step.get('ref')
-            ref_alias = step.get('ref_alias')
 
             with db.tx() as tx:
-                tx.q(parse_refs(query, refs))
+                tree = tx.query_to_tree(query, replacements=[(k, refs[k][0]) for k in refs])
+                results = tx.q(query, tree)
 
-                if ref_alias:
+                expected_results = step['result'] or []
+
+                i = 0
+                for r in expected_results:
+                    ref = r.get('key', None)
                     if ref:
-                        ref = make_item(ref)
-                    refs[ref_alias] = (str(db.last_ref), ref)
+                        del r['key']
 
-                raw_results = step['result'] or []
-                results = []
-                for r in raw_results:
-                    if isinstance(r, str):
-                        results.append(refs[r][1])
+                    if ref:
+                        if r:
+                            if ref in refs:
+                                raise Exception('duplicate ref')
+                            refs[ref] = (get_ref(results[i]).value, make_item(r))
+
+                        item = refs[ref][1]
                     else:
-                        results.append(make_item(r))
+                        item = make_item(r)
 
-                db.assert_result(results)
+                    result_tuple = results[i].as_tuples()
+                    expected_tuple = item.as_tuples()
 
-            if len(results) == 1:
-                with db.tx() as tx:
-                    tx.q(str(db.last_ref))
-                    db.assert_result(results)
+                    print(f'{str(result_tuple)} vs {str(expected_tuple)}')
+                    result_tuple = remove_variables_from_tuples(result_tuple)
+                    print(f'{str(result_tuple)} vs {str(expected_tuple)}')
+
+                    assert result_tuple == expected_tuple
+
+                    i += 1
 
     return wrapper

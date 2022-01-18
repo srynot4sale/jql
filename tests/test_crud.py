@@ -50,9 +50,9 @@ def test_create_archived(db: Store) -> str:
 def test_basic_create_add_tags(db: Store) -> str:
     return '''
     - q: "CREATE do dishes #todo #chores"
-      ref_alias: "a"
       result:
-        - db:
+        - key: a
+          db:
             content: do dishes
           todo:
           chores:
@@ -78,9 +78,9 @@ def test_basic_create_add_tags(db: Store) -> str:
 def test_basic_add_remove_tags(db: Store) -> str:
     return '''
     - q: "CREATE do dishes #todo #chores"
-      ref_alias: "a"
       result:
-        - db:
+        - key: a
+          db:
             content: do dishes
           todo:
           chores:
@@ -128,9 +128,9 @@ def test_basic_add_remove_tags(db: Store) -> str:
 def test_basic_create_add_facts(db: Store) -> str:
     return '''
     - q: "CREATE stuff #chores"
-      ref_alias: "a"
       result:
-        - db:
+        - key: a
+          db:
             content: stuff
           chores:
     - q: "@a SET #todo/immediately"
@@ -155,9 +155,9 @@ def test_basic_create_add_facts(db: Store) -> str:
 def test_basic_add_remove_facts(db: Store) -> str:
     return '''
     - q: "CREATE stuff #chores"
-      ref_alias: "a"
       result:
-        - db:
+        - key: a
+          db:
             content: stuff
           chores:
     - q: "@a SET #todo/immediately"
@@ -196,9 +196,9 @@ def test_basic_add_remove_facts(db: Store) -> str:
 def test_basic_tags_normalized(db: Store) -> str:
     return '''
     - q: "CREATE do dishes #todo #chores"
-      ref_alias: "a"
       result:
-        - db:
+        - key: a
+          db:
             content: do dishes
           todo:
           chores:
@@ -223,60 +223,56 @@ def test_basic_tags_normalized(db: Store) -> str:
 def test_list(db: Store) -> str:
     return '''
     - q: "CREATE do dishes #todo #chores"
-      ref_alias: "a"
-      ref:
-        db:
-          content: do dishes
-        todo:
-        chores:
       result:
-        - "a"
+        - key: a
+          db:
+            content: do dishes
+          todo:
+          chores:
     - q: "#chores"
       result:
-        - "a"
+        - key: a
     - q: "#todo"
       result:
-        - "a"
+        - key: a
     - q: "#notrealtag"
       result:
     - q: "do dishes"
       result:
-        - "a"
+        - key: a
     - q: "dish"
       result:
-        - "a"
+        - key: a
     - q: "disher"
       result:
     - q: "#todo #chores"
       result:
-        - "a"
+        - key: a
     - q: "#todo #fake"
       result:
     - q: "CREATE stuff #chores/late=yes"
-      ref_alias: "b"
-      ref:
-        db:
-          content: stuff
-        chores:
-          late: "yes"
       result:
-        - "b"
+        - key: b
+          db:
+            content: stuff
+          chores:
+            late: "yes"
     - q: "#todo"
       result:
-        - "a"
+        - key: a
     - q: "#chores"
       result:
-        - "a"
-        - "b"
+        - key: a
+        - key: b
     - q: "stuff"
       result:
-        - "b"
+        - key: b
     - q: "#chores/late"
       result:
-        - "b"
+        - key: b
     - q: "#chores/late=yes"
       result:
-        - "b"
+        - key: b
     - q: "#chores/late=no"
       result:
     '''
@@ -286,58 +282,54 @@ def test_list(db: Store) -> str:
 def test_list_by_content(db: Store) -> str:
     return '''
     - q: "CREATE do dishes for batman #todo #chores"
-      ref_alias: "a"
-      ref:
-        db:
-          content: do dishes for batman
-        todo:
-        chores:
       result:
-        - "a"
+        - key: a
+          db:
+            content: do dishes for batman
+          todo:
+          chores:
     - q: "CREATE tears for bATman #chores/late=yes"
-      ref_alias: "b"
-      ref:
-        db:
-          content: tears for bATman
-        chores:
-          late: "yes"
       result:
-        - "b"
+        - key: b
+          db:
+            content: tears for bATman
+          chores:
+            late: "yes"
     - q: "#chores"
       result:
-        - "a"
-        - "b"
+        - key: a
+        - key: b
     - q: "#todo"
       result:
-        - "a"
+        - key: a
     - q: "do dishes"
       result:
-        - "a"
+        - key: a
     - q: "dish"
       result:
-        - "a"
+        - key: a
     - q: "nopenope"
       result:
     - q: "for batman"
       result:
-        - "a"
-        - "b"
+        - key: a
+        - key: b
     - q: "for BATMAN"
       result:
-        - "a"
-        - "b"
+        - key: a
+        - key: b
     - q: "for"
       result:
-        - "a"
-        - "b"
+        - key: a
+        - key: b
     - q: "bat"
       result:
-        - "a"
-        - "b"
+        - key: a
+        - key: b
     - q: "MAN"
       result:
-        - "a"
-        - "b"
+        - key: a
+        - key: b
     '''
 
 
@@ -345,32 +337,28 @@ def test_list_by_content(db: Store) -> str:
 def test_list_with_revoke(db: Store) -> str:
     return '''
     - q: "CREATE do dishes #todo #chores"
-      ref_alias: "a"
-      ref:
-        db:
-          content: do dishes
-        todo:
-        chores:
       result:
-        - "a"
+        - key: a
+          db:
+            content: do dishes
+          todo:
+          chores:
     - q: "#chores"
       result:
-        - "a"
+        - key: a
     - q: "#notrealtag"
       result:
     - q: "@a DEL #chores"
-      ref_alias: "b"
-      ref:
-        db:
-          content: do dishes
-        todo:
       result:
-        - "b"
+        - key: b
+          db:
+            content: do dishes
+          todo:
     - q: "#chores"
       result:
     - q: "#todo"
       result:
-        - "b"
+        - key: b
     '''
 
 
@@ -378,29 +366,25 @@ def test_list_with_revoke(db: Store) -> str:
 def test_list_with_archive(db: Store) -> str:
     return '''
     - q: "CREATE do dishes #todo #chores"
-      ref_alias: "a"
-      ref:
-        db:
-          content: do dishes
-        todo:
-        chores:
       result:
-        - "a"
+        - key: a
+          db:
+            content: do dishes
+          todo:
+          chores:
     - q: "#chores"
       result:
-        - "a"
+        - key: a
     - q: "#notrealtag"
       result:
     - q: "@a SET #db/archived"
-      ref_alias: "b"
-      ref:
-        db:
-          content: do dishes
-          archived:
-        todo:
-        chores:
       result:
-        - "b"
+        - key: b
+          db:
+            content: do dishes
+            archived:
+          todo:
+          chores:
     - q: "#chores"
       result:
     - q: "#todo"

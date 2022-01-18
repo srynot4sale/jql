@@ -490,7 +490,7 @@ class SqliteStore(Store):
 
         cs_sql += '''
             AND f.dbid != f.changeset
-            ORDER BY f.rowid DESC, f.dbid ASC, f.changeset DESC
+            ORDER BY f.tag ASC, f.prop ASC, f.val ASC, f.dbid ASC, f.changeset DESC
         '''
 
         sets: List[Item] = []
@@ -504,7 +504,7 @@ class SqliteStore(Store):
             facts = {
                 Ref(row[5]),
                 Content(desc),
-                Value('db', 'created', str(Ref(row[6])))
+                Value('db', 'created', row[6])
             }
 
             sets.append(Item(facts=facts))
