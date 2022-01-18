@@ -437,10 +437,10 @@ class SqliteStore(Store):
             SELECT dbid, tag, prop, val
             FROM current_facts_inc_tx
             WHERE is_tx = 1
-              AND rowid IN (
-                SELECT i.rowid
-                FROM transactions i
-                ORDER BY i.rowid DESC
+              AND dbid IN (
+                SELECT rowid
+                FROM transactions
+                ORDER BY rowid DESC
                 LIMIT 100
             )
             ORDER BY rowid DESC, dbid DESC
