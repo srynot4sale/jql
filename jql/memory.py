@@ -85,7 +85,7 @@ class MemoryStore(Store):
             if is_archived(item):
                 continue
             itags = set(get_tags(item))
-            itags.add(Tag('db'))
+            itags.add(Tag('_db'))
             for t in itags:
                 if not t.tag.startswith(prefix):
                     continue
@@ -93,7 +93,7 @@ class MemoryStore(Store):
                     tags[t.tag] = 0
                 tags[t.tag] += 1
 
-        return [Item(facts={Tag(t), Value('db', 'count', str(tags[t]))}) for t in sorted(tags.keys())]
+        return [Item(facts={Tag(t), Value('_db', 'count', str(tags[t]))}) for t in sorted(tags.keys())]
 
     def _get_props_as_items(self, tag: str, prefix: str = '') -> List[Item]:
         tags: Dict[str, int] = {}
@@ -113,7 +113,7 @@ class MemoryStore(Store):
                     tags[f.prop] = 0
                 tags[f.prop] += 1
 
-        return [Item(facts={Flag(tag, t), Value('db', 'count', str(tags[t]))}) for t in sorted(tags.keys())]
+        return [Item(facts={Flag(tag, t), Value('_db', 'count', str(tags[t]))}) for t in sorted(tags.keys())]
 
     def _next_ref(self, uid: str, created: str, changeset: bool = False) -> Tuple[Fact, int]:
         new_id = len(self._items.keys())

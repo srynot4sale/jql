@@ -7,7 +7,7 @@ from typing import List, Optional, Iterable, Set, Tuple
 import uuid
 
 
-from jql.types import Content, Fact, Flag, get_created_time, Item, is_ref, Ref, Tag, Value
+from jql.types import Content, Fact, get_created_time, Item, is_ref, Ref, Tag, Value
 from jql.changeset import ChangeSet
 
 
@@ -46,17 +46,16 @@ class Store(ABC):
 
         facts = {
             cs_ref,
-            Flag('db', 'tx'),
-            Value('db', 'created', str(datetime.datetime.now())),
-            Tag('tx'),
-            Value('tx', 'client', changeset.client),
-            Value('tx', 'created', str(changeset.created)),
-            Value('tx', 'uuid', str(changeset.uuid)),
+            Value('_db', 'created', str(datetime.datetime.now())),
+            Tag('_tx'),
+            Value('_tx', 'client', changeset.client),
+            Value('_tx', 'created', str(changeset.created)),
+            Value('_tx', 'uuid', str(changeset.uuid)),
             Content(content),
         }
 
         if changeset.query:
-            facts.add(Value('tx', 'query', changeset.query))
+            facts.add(Value('_tx', 'query', changeset.query))
 
         cs = Item(facts=facts)
         self._create_item(cs_ref, cs)

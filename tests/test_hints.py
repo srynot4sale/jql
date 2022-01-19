@@ -2,11 +2,10 @@ from jql.types import Flag, Item, Tag, Value
 
 
 def test_hints(db) -> None:
-    tag_db = Item(facts={Tag("db"), Value("db", "count", "2")})
-    tag_do = Item(facts={Tag("do"), Value("db", "count", "1")})
-    tag_todo = Item(facts={Tag("todo"), Value("db", "count", "2")})
-    tag_tomorrow = Item(facts={Tag("tomorrow"), Value("db", "count", "1")})
-    flag_todo = Item(facts={Flag("todo", "waiting"), Value("db", "count", "1")})
+    tag_do = Item(facts={Tag("do"), Value("_db", "count", "1")})
+    tag_todo = Item(facts={Tag("todo"), Value("_db", "count", "2")})
+    tag_tomorrow = Item(facts={Tag("tomorrow"), Value("_db", "count", "1")})
+    flag_todo = Item(facts={Flag("todo", "waiting"), Value("_db", "count", "1")})
 
     with db.tx() as tx:
         tx.q("HINTS #do")
@@ -20,7 +19,7 @@ def test_hints(db) -> None:
 
     with db.tx() as tx:
         tx.q("HINTS #d")
-        db.assert_result([tag_db, tag_do])
+        db.assert_result([tag_do])
 
     with db.tx() as tx:
         tx.q("HINTS #do")
@@ -52,10 +51,10 @@ def test_hints(db) -> None:
 
 
 def test_hints_after_archive(db) -> None:
-    tag_todo = Item(facts={Tag("todo"), Value("db", "count", "2")})
-    tag_todo_single = Item(facts={Tag("todo"), Value("db", "count", "1")})
-    tag_tomorrow = Item(facts={Tag("tomorrow"), Value("db", "count", "1")})
-    flag_todo = Item(facts={Flag("todo", "waiting"), Value("db", "count", "1")})
+    tag_todo = Item(facts={Tag("todo"), Value("_db", "count", "2")})
+    tag_todo_single = Item(facts={Tag("todo"), Value("_db", "count", "1")})
+    tag_tomorrow = Item(facts={Tag("tomorrow"), Value("_db", "count", "1")})
+    flag_todo = Item(facts={Flag("todo", "waiting"), Value("_db", "count", "1")})
 
     with db.tx() as tx:
         tx.q("HINTS #do")
@@ -82,7 +81,7 @@ def test_hints_after_archive(db) -> None:
         db.assert_result([flag_todo])
 
     with db.tx() as tx:
-        tx.q(f"{ref} SET #db/archived")
+        tx.q(f"{ref} SET #_db/archived")
 
     with db.tx() as tx:
         tx.q("HINTS #todo")

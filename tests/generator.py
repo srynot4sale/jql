@@ -10,12 +10,18 @@ def make_item(result: Any) -> Item:
     facts = set()
 
     for t in result:
-        if t != "db":
+        r = result[t]
+        if t == "db":
+            t = "_db"
+
+        if t != "_db":
             facts.add(Tag(t))
-        if not result[t]:
+
+        if not r:
             continue
-        for f in result[t]:
-            v = result[t][f]
+
+        for f in r:
+            v = r[f]
             if v is None:
                 facts.add(Flag(t, f))
             else:

@@ -34,7 +34,7 @@ def test_multiple_creates(db: Store) -> str:
 @yamltest
 def test_create_archived(db: Store) -> str:
     return '''
-    - q: "CREATE go to supermarket #todo #todo/completed #db/archived"
+    - q: "CREATE go to supermarket #todo #todo/completed #_db/archived"
       result:
         - db:
             content: go to supermarket
@@ -377,7 +377,7 @@ def test_list_with_archive(db: Store) -> str:
         - key: a
     - q: "#notrealtag"
       result:
-    - q: "@a SET #db/archived"
+    - q: "@a SET #_db/archived"
       result:
         - key: b
           db:

@@ -86,7 +86,7 @@ def is_hidden_sys(fact: Fact) -> bool:
 
 
 def has_sys_tag(fact: Fact) -> bool:
-    return tag_eq("db")(fact)
+    return require_fact(fact) and fact.tag.startswith('_')
 
 
 def require_fact(fact: Fact) -> bool:
@@ -142,14 +142,14 @@ def TagRef(tag: str, ref: str) -> Fact:
 
 
 def Ref(ref: str) -> Fact:
-    return TagRef("db", ref)
+    return TagRef("_db", ref)
 
 
 def Content(value: str) -> Fact:
     if len(value):
-        return Value(tag="db", prop="content", value=value)
+        return Value(tag="_db", prop="content", value=value)
     else:
-        return Flag(tag="db", prop="content")
+        return Flag(tag="_db", prop="content")
 
 
 def fact_from_dict(f: dict[str, str]) -> Fact:
@@ -225,6 +225,10 @@ def has_flag(item: Facts, tag: str, prop: str) -> bool:
     return len({f for f in item if tag_eq(tag)(f) and prop_eq(prop)(f)}) >= 1
 
 
+def has_tag(item: Facts, tag: str) -> bool:
+    return tag in {f.tag for f in item}
+
+
 def update_item(item: Item, add: Iterable[Fact]) -> Item:
     return Item(item.facts.union(add))
 
@@ -240,16 +244,16 @@ def has_ref(item: Item) -> bool:
 def single(facts: Iterable[Fact]) -> Fact:
     f = list(facts)
     if len(f) != 1:
-        raise Exception(f'Expected a single fact, but got {len(f)}: {facts}')
+        raise Exception(f'Expected a single fact, but got {len(f)}: {list(facts)}')
     return f[0]
 
 
 def is_tx(item: Facts) -> bool:
-    return has_flag(item, "db", "tx")
+    return has_tag(item, "_tx")
 
 
 def is_archived(item: Facts) -> bool:
-    return has_flag(item, "db", "archived")
+    return has_flag(item, "_db", "archived")
 
 
 def get_ref(item: Facts) -> Fact:
@@ -273,4 +277,4 @@ def get_content(item: Facts) -> Fact:
 
 
 def get_created_time(item: Facts) -> Fact:
-    return get_fact(item, "db", "created")
+    return get_fact(item, "_db", "created")

@@ -267,7 +267,7 @@ class SqliteStore(Store):
                 d.append(fact.prop)
             elif is_content(fact):
                 # Content is a caseless substr match
-                w = f"{prefix}.tag = 'db' AND {prefix}.prop = 'content' AND {prefix}.val LIKE ?"
+                w = f"{prefix}.tag = '_db' AND {prefix}.prop = 'content' AND {prefix}.val LIKE ?"
                 d.append(f'%{fact.value}%')
             elif has_value(fact):
                 w = f"{prefix}.tag = ? AND {prefix}.prop = ? AND {prefix}.val = ?"
@@ -330,7 +330,7 @@ class SqliteStore(Store):
 
         archive_changed = None
         for f in facts:
-            if f.tag == "db" and f.prop == "archived":
+            if f.tag == "_db" and f.prop == "archived":
                 archive_changed = not revoke
 
             values.append((csid, dbid, f.tag, f.prop, f.value, revoke))
@@ -366,7 +366,7 @@ class SqliteStore(Store):
         for row in cur.execute(tags_sql, params):
             tags.append((Tag(row[0]), str(row[1])))
 
-        return [Item(facts={t[0], Value('db', 'count', t[1])}) for t in tags]
+        return [Item(facts={t[0], Value('_db', 'count', t[1])}) for t in tags]
 
     def _get_props_as_items(self, tag: str, prefix: str = '') -> List[Item]:
         props: List[Tuple[Fact, str]] = []
@@ -392,7 +392,7 @@ class SqliteStore(Store):
         for row in cur.execute(props_sql, params):
             props.append((Flag(tag, row[0]), str(row[1])))
 
-        return [Item(facts={t[0], Value('db', 'count', t[1])}) for t in props]
+        return [Item(facts={t[0], Value('_db', 'count', t[1])}) for t in props]
 
     def _record_changeset(self, changeset: ChangeSet) -> str:
         cur = self._conn.cursor()
@@ -504,7 +504,7 @@ class SqliteStore(Store):
             facts = {
                 Ref(row[5]),
                 Content(desc),
-                Value('db', 'created', row[6])
+                Value('_db', 'created', row[6])
             }
 
             sets.append(Item(facts=facts))

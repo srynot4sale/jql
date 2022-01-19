@@ -23,8 +23,7 @@ def test_basic_changesets_call(db: Client) -> str:
       result:
         - db:
             content: '[{"facts": [{"tag": "todo", "prop": "completed", "value": "", "tx": null}], "ref": "??????", "uid": null, "revoke": false}]'
-            tx:
-          tx:
+          _tx:
             created: ????-??-??
             query: '@a SET #todo/completed'
             uuid: ????????
@@ -48,13 +47,13 @@ def test_history(db: Client) -> str:
     - q: "HISTORY"
       result:
         - db:
-            content: "??????: Added Tag('chores')"
-        - db:
             content: "??????: Added Content('groceries')"
         - db:
-            content: "??????: Added Value(tag='db', prop='created', value='????-??-??')"
+            content: "??????: Added Value(tag='_db', prop='created', value='????-??-??')"
         - db:
             content: "??????: Added Ref('??????')"
+        - db:
+            content: "??????: Added Tag('chores')"
     '''
 
 
@@ -81,7 +80,7 @@ def test_item_history(db: Client) -> str:
         - db:
             content: Added Content('go to supermarket')
         - db:
-            content: Added Value(tag='db', prop='created', value='????-??-??')
+            content: Added Value(tag='_db', prop='created', value='????-??-??')
         - db:
             content: Added Ref('??????')
         - db:

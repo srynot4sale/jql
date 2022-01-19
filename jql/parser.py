@@ -37,7 +37,7 @@ jql_parser = Lark(r"""
 
     ID      : HEXDIGIT+
     HEXDIGIT: "a".."f"|DIGIT
-    TAG     : (LCASE_LETTER) (LCASE_LETTER|DIGIT)*
+    TAG     : "_"? (LCASE_LETTER) (LCASE_LETTER|DIGIT)*
     PROP    : (LCASE_LETTER) ("_"|LCASE_LETTER|DIGIT)*
     %import common.LCASE_LETTER
     %import common.DIGIT

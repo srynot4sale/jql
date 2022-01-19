@@ -59,8 +59,8 @@ class Transaction:
 
         self.start()
         self.log.msg("tx.create_item()", facts=facts)
-        if not has_flag(Item(facts=facts), 'db', 'created'):
-            facts.add(Value('db', 'created', str(datetime.datetime.now())))
+        if not has_flag(Item(facts=facts), '_db', 'created'):
+            facts.add(Value('_db', 'created', str(datetime.datetime.now())))
 
         self._add_change(Change(uid=str(uuid.uuid4()), facts=facts))
 
