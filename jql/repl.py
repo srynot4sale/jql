@@ -20,7 +20,7 @@ else:
     store_path = "./repl.jdb"
 
 store = SqliteStore(location=store_path)
-client = Client(store=store, client="repl:user", log_level=logging.ERROR)
+client = Client(store=store, client="repl:user", log_level=logging.WARNING)
 
 
 log = structlog.get_logger()

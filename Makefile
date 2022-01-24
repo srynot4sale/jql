@@ -43,7 +43,7 @@ lint: ## Lint code
 .PHONY: repl
 repl: ## Run REPL
 	docker build -f Dockerfile.repl -t jql-repl .
-	docker run --rm -ti -v jql-repl:/data jql-repl
+	docker run --rm --env-file secrets.env -ti -v jql-repl:/data jql-repl
 
 
 -include Makefile.local

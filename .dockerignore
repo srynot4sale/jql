@@ -25,3 +25,4 @@ Makefile
 
 *.jdb
 /temp/
+secrets.env

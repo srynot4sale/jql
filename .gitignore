@@ -20,3 +20,4 @@ __pycache__/
 Makefile.local
 /jql.egg-info/
 /venv/
+secrets.env

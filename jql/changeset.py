@@ -3,7 +3,7 @@ import datetime
 from typing import Any, Dict, List, Optional, Set
 
 
-from jql.types import Fact
+from jql.types import Fact, fact_from_dict, Ref
 
 
 @dataclass()
@@ -21,6 +21,20 @@ class Change:
             'revoke': self.revoke
         }
 
+    @classmethod
+    def from_dict(cls, c: Dict[str, Any]) -> 'Change':
+        if c.get('ref'):
+            ref = Ref(c['ref'])
+        else:
+            ref = None
+
+        return Change(
+            facts={fact_from_dict(f) for f in c.get('fact', [])},
+            ref=ref,
+            uid=c.get('uid', None),
+            revoke=c.get('revoke', False)
+        )
+
 
 @dataclass()
 class ChangeSet:
@@ -32,3 +46,7 @@ class ChangeSet:
 
     def changes_as_dict(self) -> List[Dict[str, Any]]:
         return [c.to_dict() for c in self.changes]
+
+    @classmethod
+    def changes_from_dict(cls, changes: List[Dict[str, Any]]) -> List[Change]:
+        return [Change.from_dict(c) for c in changes]

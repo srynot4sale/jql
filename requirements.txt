@@ -3,3 +3,6 @@ structlog
 colorama
 hashids
 prompt_toolkit
+pynamodb
+huey
+gevent
