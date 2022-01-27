@@ -1,6 +1,6 @@
 import pytest
 
-from jql.memory import MemoryStore
+from jql.store.memory import MemoryStore
 
 
 examples = [1, 2, 3, 5, 10, 35, 543, 1234, 5567, 87678]

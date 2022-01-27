@@ -6,8 +6,8 @@ from typing import Dict, Generator, Iterator, List, Literal, Union
 
 from jql.client import Client
 from jql.store import Store
-from jql.memory import MemoryStore
-from jql.sqlite import SqliteStore
+from jql.store.memory import MemoryStore
+from jql.store.sqlite import SqliteStore
 from jql.types import get_ref, Fact, Item, Ref
 from jql.transaction import Transaction
 

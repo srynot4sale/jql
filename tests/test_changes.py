@@ -1,5 +1,5 @@
 from jql.client import Client
-from jql.memory import MemoryStore
+from jql.store.memory import MemoryStore
 from generator import yamltest
 
 

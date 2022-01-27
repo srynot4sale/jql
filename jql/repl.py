@@ -10,7 +10,7 @@ from typing import List, Optional, Tuple
 
 
 from jql.client import Client
-from jql.sqlite import SqliteStore
+from jql.store.sqlite import SqliteStore
 from jql.types import Item, get_content, get_props, get_ref, get_tags, has_ref, has_sys_tag, has_value, get_facts, single
 
 
