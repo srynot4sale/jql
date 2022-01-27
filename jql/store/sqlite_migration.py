@@ -421,7 +421,7 @@ def data_migration(conn: sqlite3.Connection) -> None:
         conn.commit()
 
 
-if sys.__name__ == '__main__':
+if __name__ == '__main__':
     dbpath = sys.argv[1]
     conn = sqlite3.connect(dbpath)
     schema_migration(conn)
