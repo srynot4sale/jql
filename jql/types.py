@@ -198,8 +198,12 @@ def get_facts(item: Facts) -> Facts:
     return {f for f in item if not is_hidden_sys(f)}
 
 
+def get_all_tags(item: Facts) -> Facts:
+    return {Tag(f.tag) for f in item}
+
+
 def get_tags(item: Facts) -> Facts:
-    return {Tag(f.tag) for f in item if not has_sys_tag(f)}
+    return {t for t in get_all_tags(item) if not has_sys_tag(t)}
 
 
 def get_props(item: Facts) -> Facts:
