@@ -43,7 +43,11 @@ lint: ## Lint code
 .PHONY: repl
 repl: ## Run REPL
 	docker build -f Dockerfile.repl -t jql-repl .
-	docker run --rm -ti -v jql-repl:/data jql-repl
+	docker run --rm --env-file secrets.env -ti -v jql-repl:/data jql-repl
 
+.PHONY: replmigrate
+replmigrate: ## Run REPL migration
+	docker build -f Dockerfile.repl -t jql-repl .
+	docker run --rm --env-file secrets.env -t -v jql-repl:/data jql-repl python jql/store/sqlite_migration.py /data/repl.jdb
 
 -include Makefile.local

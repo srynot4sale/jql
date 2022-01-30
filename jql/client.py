@@ -4,9 +4,13 @@ from structlog.stdlib import LoggerFactory
 import sys
 from typing import List
 
-from jql.store import Store
-from jql.types import Item
-from jql.transaction import Transaction
+from gevent import monkey  # type: ignore
+monkey.patch_all()
+
+
+from jql.store import Store  # noqa: E402
+from jql.types import Item  # noqa: E402
+from jql.transaction import Transaction  # noqa: E402
 
 
 class Client:
@@ -15,10 +19,21 @@ class Client:
     user: str
     store: Store
 
+    _stores: List[Store] = []
+
+    @classmethod
+    def get_stores(cls) -> List[Store]:
+        return cls._stores
+
+    @classmethod
+    def add_store(cls, store: Store) -> None:
+        cls._stores.append(store)
+
     def __init__(self, store: Store, client: str, log_level: int = logging.INFO):
         self.ref = client
         self.name, self.user = client.split(':')
         self.store = store
+        self.add_store(store)
 
         logging.basicConfig(
             stream=sys.stdout,

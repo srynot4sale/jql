@@ -7,6 +7,7 @@ from typing import FrozenSet, List, Iterable, Set, Optional, Tuple
 
 from jql.changeset import Change, ChangeSet
 from jql.store import Store
+from jql.tasks import replicate_changeset
 from jql.types import Content, Fact, Flag, Item, Ref, Value, is_tag, is_flag, is_content, get_ref, has_value, Tag, fact_from_dict
 
 
@@ -228,7 +229,12 @@ class SqliteStore(Store):
     def _record_changeset(self, changeset: ChangeSet) -> str:
         cur = self._conn.cursor()
         cur.execute('INSERT INTO changesets (uuid, client, created, query, changes) VALUES (?, ?, ?, ?, ?)', (changeset.uuid, changeset.client, changeset.created, changeset.query, json.dumps(changeset.changes_as_dict())))
+        rowid = int(cur.lastrowid)
         self._conn.commit()
+
+        if self.replicate:
+            replicate_changeset(self._salt, rowid, changeset)
+
         return changeset.uuid
 
     def _load_changeset(self, changeset_uuid: str) -> ChangeSet:

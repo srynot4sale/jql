@@ -3,6 +3,7 @@ from hashids import Hashids  # type: ignore
 import datetime
 import json
 import string
+import os
 from typing import List, Optional, Iterable, Set, Tuple
 import uuid
 
@@ -15,6 +16,7 @@ class Store(ABC):
     def __init__(self, salt: str = "") -> None:
         self._salt = salt if salt else str(uuid.uuid4())
         self._hashstore = Hashids(salt=self._salt, alphabet=string.hexdigits[:16], min_length=6)
+        self.replicate = os.getenv('REPLICATE', False) is not False
 
     def get_item(self, ref: Fact) -> Optional[Item]:
         if not is_ref(ref):
