@@ -20,9 +20,9 @@ RUN pip install -r /tmp/requirements-test.txt
 
 CMD ["/code/test.sh"]
 
+COPY vendor/ /code/vendor
 COPY setup.cfg /code/
 COPY setup.py /code/
-COPY jql/ /code/jql
-COPY vendor/ /code/vendor
-COPY tests/ /code/tests
 COPY test.sh /code/
+COPY tests/ /code/tests
+COPY jql/ /code/jql
