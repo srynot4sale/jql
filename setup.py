@@ -14,5 +14,8 @@ setup(name='jql',
           'colorama',
           'hashids',
           'prompt_toolkit',
+          'pynamodb',
+          'huey',
+          'gevent'
       ],
       zip_safe=False)
