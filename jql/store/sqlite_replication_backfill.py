@@ -5,6 +5,7 @@ import json
 import logging
 import sqlite3
 import sys
+import time
 from typing import Any, Dict, List
 
 from pynamodb.models import Model
@@ -13,6 +14,9 @@ from pynamodb.attributes import (UnicodeAttribute, NumberAttribute, UTCDateTimeA
 from jql.changeset import ChangeSet, Change
 from jql.types import Ref, fact_from_dict
 from jql.store.sqlite import SqliteStore
+
+
+DEFAULT_SLEEP = 1
 
 
 class ReplicatedChangesets(Model):
@@ -26,7 +30,7 @@ class ReplicatedChangesets(Model):
     content = UnicodeAttribute()
 
 
-def backfill_replication(store: SqliteStore) -> None:
+def backfill_replication(store: SqliteStore, sleep_secs) -> None:
     cur = store._conn.cursor()
     res = cur.execute('SELECT rowid, client, created, query, changes, origin, origin_rowid, uuid FROM changesets WHERE origin = ? ORDER BY rowid', (store.uuid,))
     for cs in res:
@@ -55,11 +59,13 @@ def backfill_replication(store: SqliteStore) -> None:
 
         # Check if already exists
         try:
+            time.sleep(sleep_secs)
             ReplicatedChangesets.get(changeset.origin, changeset.origin_rowid)
             print(f'{changeset.origin_rowid} already exists, skipping')
             continue
 
         except ReplicatedChangesets.DoesNotExist:
+            time.sleep(sleep_secs)
             print(changeset)
             replicate = {
                 'uuid': changeset.uuid,
@@ -74,5 +80,6 @@ def backfill_replication(store: SqliteStore) -> None:
 
 if __name__ == '__main__':
     store_path = sys.argv[1]
+    sleep_secs = float(sys.argv[2]) if len(sys.argv) > 2 else DEFAULT_SLEEP
     store = SqliteStore(location=store_path)
-    backfill_replication(store)
+    backfill_replication(store, sleep_secs)
