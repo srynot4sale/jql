@@ -3,6 +3,7 @@ import json
 import os
 import structlog
 import queue
+from threading import RLock
 from typing import Any, Dict, TYPE_CHECKING
 from pynamodb.models import Model
 from pynamodb.attributes import (UnicodeAttribute, NumberAttribute, UTCDateTimeAttribute)
@@ -22,6 +23,7 @@ if TYPE_CHECKING:
 else:
     TO_REPLICATE = queue.Queue()
 
+INGEST_LOCK = RLock()
 LAST_INGESTED: Dict[str, Dict[str, int]] = {}
 
 
@@ -70,6 +72,7 @@ def replicate_changeset(changeset: ChangeSet) -> None:
 
 @taskqueue.task(crontab(minute='*'))  # type: ignore
 def ingest_replication() -> None:
+    global INGEST_LOCK
     global LAST_INGESTED
 
     ingest = os.getenv('INGEST', '')
@@ -78,7 +81,12 @@ def ingest_replication() -> None:
 
     task_log = structlog.get_logger()
     task_log = task_log.bind(task='ingest_replication')
+
     try:
+        if not INGEST_LOCK.acquire(blocking=False):
+            task_log.error("Cannot acquire INGEST_LOCK")
+            return
+
         if not ReplicatedChangesets.exists():
             task_log.error('No replication table to pull from')
             return
@@ -121,5 +129,8 @@ def ingest_replication() -> None:
 
                 LAST_INGESTED[stuuid][sourceid] = last
 
+            INGEST_LOCK.release()
+
     except BaseException as e:
+        INGEST_LOCK.release()
         task_log.exception(e)
