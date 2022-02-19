@@ -17,12 +17,11 @@ class SqliteStore(Store):
 
         cur = self._conn.cursor()
         current_version = cur.execute('pragma user_version').fetchone()[0]
-        if not current_version or current_version < 9:
-            if location == ':memory:':
-                import jql.store.sqlite_migration
-                jql.store.sqlite_migration.schema_migration(self._conn)
-            else:
-                raise Exception('Database needs migration run')
+        if not current_version:
+            import jql.store.sqlite_migration
+            jql.store.sqlite_migration.schema_migration(self._conn)
+        elif current_version < 9:
+            raise Exception('Database needs migration run')
 
         # Look for existing salt
         cur.execute("SELECT val FROM config WHERE key='salt'")
