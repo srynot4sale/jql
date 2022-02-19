@@ -70,7 +70,6 @@ def backfill_replication(store: SqliteStore) -> None:
             }
             rc = ReplicatedChangesets(changeset.origin, changeset.origin_rowid, received=datetime.datetime.utcnow(), content=json.dumps(replicate))
             rc.save()
-            break
 
 
 if __name__ == '__main__':
