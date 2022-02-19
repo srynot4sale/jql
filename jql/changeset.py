@@ -29,7 +29,7 @@ class Change:
             ref = None
 
         return Change(
-            facts={fact_from_dict(f) for f in c.get('fact', [])},
+            facts={fact_from_dict(f) for f in c.get('facts', [])},
             ref=ref,
             uid=c.get('uid', None),
             revoke=c.get('revoke', False)
