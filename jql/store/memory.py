@@ -153,3 +153,6 @@ class MemoryStore(Store):
                 break
 
         return res
+
+    def _get_last_ingested_changeset(self, dbuuid: str) -> int:
+        return 0

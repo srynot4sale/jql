@@ -61,12 +61,17 @@ def schema_migration(conn: sqlite3.Connection) -> None:
             client text,
             created timestamp,
             query text,
-            changes text
+            changes text,
+            origin text,
+            origin_rowid int
         )
     ''')
     if current_version and current_version < 5:
         cur.execute('''ALTER TABLE changesets ADD COLUMN changes text''')
-        cur.execute('''PRAGMA user_version = 5''')
+
+    if current_version and current_version < 10:
+        cur.execute('''ALTER TABLE changesets ADD COLUMN origin text''')
+        cur.execute('''ALTER TABLE changesets ADD COLUMN origin_rowid int''')
 
     cur.execute('''CREATE INDEX IF NOT EXISTS idx_changesets_uuid ON changesets (uuid)''')
 
@@ -138,7 +143,7 @@ def schema_migration(conn: sqlite3.Connection) -> None:
                 END
     ''')
 
-    cur.execute('''PRAGMA user_version = 9''')
+    cur.execute('''PRAGMA user_version = 10''')
 
     conn.commit()
 
@@ -217,6 +222,7 @@ def data_migration(conn: sqlite3.Connection) -> None:
             uid = c['uuid']
             created = c['created']
             client = c['client']
+            origin = c['origin']
             if c['changes']:
                 changes = json.loads(c['changes'])
             else:
@@ -233,6 +239,10 @@ def data_migration(conn: sqlite3.Connection) -> None:
 
                 changes_json = json.dumps(changes)
                 cur.execute('UPDATE changesets SET changes = ? WHERE rowid = ?', (changes_json, rowid))
+            if not origin:
+                print('Adding missing origin field to changeset')
+                cur.execute('UPDATE changesets SET origin = ? WHERE rowid = ?', (config['salt'], rowid))
+                origin = config['salt']
 
             # Get changeset item
             cidl = changeset_uids[uid]
@@ -356,6 +366,18 @@ def data_migration(conn: sqlite3.Connection) -> None:
             if not found:
                 print('No _tx/uuid found, so inserting!', dict(cidl))
                 cur.execute('INSERT INTO facts (changeset, dbid, tag, prop, val, revoke, current) VALUES (?, ?, ?, ?, ?, ?, ?)', [cidl_rowid, cidl_rowid, '_tx', 'uuid', uid, 0, 1])
+
+            found = False
+            for csf in cs_facts:
+                if csf['tag'] == '_tx' and csf['prop'] == 'origin':
+                    found = True
+                    if csf['val'] != origin:
+                        raise Exception('Wrong origin set for tx', dict(csf), dict(c))
+                    break
+
+            if not found:
+                print('No _tx/origin found, so inserting!', cs_facts)
+                cur.execute('INSERT INTO facts (changeset, dbid, tag, prop, val, revoke, current) VALUES (?, ?, ?, ?, ?, ?, ?)', [cidl_rowid, cidl_rowid, '_tx', 'origin', origin, 0, 1])
 
         # Review items
         for ui in uids:

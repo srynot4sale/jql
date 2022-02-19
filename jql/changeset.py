@@ -40,6 +40,8 @@ class Change:
 class ChangeSet:
     uuid: str
     client: str
+    origin: str
+    origin_rowid: int
     created: datetime.datetime
     query: str
     changes: List[Change]

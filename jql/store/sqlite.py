@@ -20,7 +20,7 @@ class SqliteStore(Store):
         if not current_version:
             import jql.store.sqlite_migration
             jql.store.sqlite_migration.schema_migration(self._conn)
-        elif current_version < 9:
+        elif current_version < 10:
             raise Exception('Database needs migration run')
 
         # Look for existing salt
@@ -227,18 +227,19 @@ class SqliteStore(Store):
 
     def _record_changeset(self, changeset: ChangeSet) -> str:
         cur = self._conn.cursor()
-        cur.execute('INSERT INTO changesets (uuid, client, created, query, changes) VALUES (?, ?, ?, ?, ?)', (changeset.uuid, changeset.client, changeset.created, changeset.query, json.dumps(changeset.changes_as_dict())))
+        cur.execute('INSERT INTO changesets (uuid, client, created, query, changes, origin, origin_rowid) VALUES (?, ?, ?, ?, ?, ?, ?)', (changeset.uuid, changeset.client, changeset.created, changeset.query, json.dumps(changeset.changes_as_dict()), changeset.origin, changeset.origin_rowid))
         rowid = int(cur.lastrowid)
         self._conn.commit()
 
-        if self.replicate:
-            replicate_changeset(self._salt, rowid, changeset)
+        if self.replicate and changeset.origin == self.uuid:
+            changeset.origin_rowid = rowid
+            replicate_changeset(changeset)
 
         return changeset.uuid
 
     def _load_changeset(self, changeset_uuid: str) -> ChangeSet:
         cur = self._conn.cursor()
-        cur.execute('SELECT rowid, client, created, query, changes FROM changesets WHERE uuid = ?', (changeset_uuid,))
+        cur.execute('SELECT rowid, client, created, query, changes, origin, origin_rowid FROM changesets WHERE uuid = ?', (changeset_uuid,))
         cs = cur.fetchone()
         if not cs:
             raise Exception(f'Could not find changeset {changeset_uuid}')
@@ -248,6 +249,8 @@ class SqliteStore(Store):
             client=cs[1],
             created=cs[2],
             query=cs[3],
+            origin=cs[5],
+            origin_rowid=cs[6],
             changes=[]
         )
 
@@ -346,3 +349,8 @@ class SqliteStore(Store):
             sets.append(Item(facts=facts))
 
         return sets
+
+    def _get_last_ingested_changeset(self, dbuuid: str) -> int:
+        cur = self._conn.cursor()
+        cs = cur.execute('SELECT MAX(origin_rowid) FROM changesets WHERE origin = ? GROUP BY origin', (dbuuid,)).fetchone()
+        return 0 if not cs else int(cs[0])

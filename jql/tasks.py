@@ -18,9 +18,9 @@ taskqueue = MiniHuey()
 taskqueue.start()
 
 if TYPE_CHECKING:
-    TO_REPLICATE: Dict[str, queue.Queue[Any]] = {}
+    TO_REPLICATE: queue.Queue[Any] = queue.Queue()
 else:
-    TO_REPLICATE = {}
+    TO_REPLICATE = queue.Queue()
 
 LAST_INGESTED: Dict[str, Dict[str, int]] = {}
 
@@ -37,22 +37,20 @@ class ReplicatedChangesets(Model):
 
 
 @taskqueue.task()  # type: ignore
-def replicate_changeset(dbcode: str, rowid: int, changeset: ChangeSet) -> None:
+def replicate_changeset(changeset: ChangeSet) -> None:
     global TO_REPLICATE
 
     task_log = structlog.get_logger()
     task_log = task_log.bind(task='replicate_changeset')
-    if dbcode not in TO_REPLICATE:
-        TO_REPLICATE[dbcode] = queue.Queue()
-    TO_REPLICATE[dbcode].put((rowid, changeset))
+    TO_REPLICATE.put(changeset)
 
     try:
         # Ship to dynamodb
         if not ReplicatedChangesets.exists():
             ReplicatedChangesets.create_table(read_capacity_units=1, write_capacity_units=1, wait=True)
 
-        while not TO_REPLICATE[dbcode].empty():
-            csrowid, cs = TO_REPLICATE[dbcode].get()
+        while not TO_REPLICATE.empty():
+            cs = TO_REPLICATE.get()
 
             replicate = {
                 'uuid': cs.uuid,
@@ -61,10 +59,67 @@ def replicate_changeset(dbcode: str, rowid: int, changeset: ChangeSet) -> None:
                 'query': cs.query,
                 'changes': cs.changes_as_dict()
             }
-            rc = ReplicatedChangesets(dbcode, csrowid, received=datetime.datetime.utcnow(), content=json.dumps(replicate))
+            rc = ReplicatedChangesets(cs.origin, cs.origin_rowid, received=datetime.datetime.utcnow(), content=json.dumps(replicate))
             rc.save()
-            TO_REPLICATE[dbcode].task_done()
-            task_log.info(f'Replicated changeset {csrowid} - {repr(replicate)}')
+            TO_REPLICATE.task_done()
+            task_log.warning(f'Replicated changeset {cs.origin_rowid} - {repr(replicate)}')
+
+    except BaseException as e:
+        task_log.exception(e)
+
+
+@taskqueue.task(crontab(minute='*'))  # type: ignore
+def ingest_replication() -> None:
+    global LAST_INGESTED
+
+    ingest = os.getenv('INGEST', '')
+    if not ingest:
+        return
+
+    task_log = structlog.get_logger()
+    task_log = task_log.bind(task='ingest_replication')
+    try:
+        if not ReplicatedChangesets.exists():
+            task_log.error('No replication table to pull from')
+            return
+
+        # Pull from dynamodb
+        for store in Client.get_stores():
+            stuuid = store.uuid
+            sources = store.get_items([Tag('_ingest')])
+
+            if not sources:
+                continue
+
+            if stuuid not in LAST_INGESTED:
+                LAST_INGESTED[stuuid] = {}
+
+            task_log.warning(f'Ingest replication for store {stuuid}')
+            for source in sources:
+                sourceid = get_content(source).value
+                if sourceid not in LAST_INGESTED[stuuid]:
+                    LAST_INGESTED[stuuid][sourceid] = store.get_last_ingested_changeset(sourceid)
+
+                last = LAST_INGESTED[stuuid][sourceid]
+                task_log.warning(f'Ingesting from {sourceid} since {last}')
+                for item in ReplicatedChangesets.query(sourceid, ReplicatedChangesets.changeset_rowid > last):
+                    content = json.loads(item.content)
+                    changeset = ChangeSet(
+                        uuid=content['uuid'],
+                        origin=item.db_uuid,
+                        origin_rowid=int(item.changeset_rowid),
+                        client=content['client'],
+                        created=datetime.datetime.fromisoformat(content['created']),
+                        query=content['query'],
+                        changes=ChangeSet.changes_from_dict(content['changes'])
+                    )
+
+                    cid = store.record_changeset(changeset)
+                    store.apply_changeset(cid)
+                    task_log.warning(f'Ingested changeset {item.changeset_rowid} - {repr(content)}')
+                    last = int(item.changeset_rowid)
+
+                LAST_INGESTED[stuuid][sourceid] = last
 
     except BaseException as e:
         task_log.exception(e)

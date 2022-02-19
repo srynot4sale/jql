@@ -16,7 +16,17 @@ class Store(ABC):
     def __init__(self, salt: str = "") -> None:
         self._salt = salt if salt else str(uuid.uuid4())
         self._hashstore = Hashids(salt=self._salt, alphabet=string.hexdigits[:16], min_length=6)
-        self.replicate = os.getenv('REPLICATE', False) is not False
+
+    @property
+    def replicate(self) -> bool:
+        return os.getenv('REPLICATE', False) is not False
+
+    @property
+    def uuid(self) -> str:
+        return self._salt
+
+    def get_last_ingested_changeset(self, dbuuid: str) -> int:
+        return self._get_last_ingested_changeset(dbuuid)
 
     def get_item(self, ref: Fact) -> Optional[Item]:
         if not is_ref(ref):
@@ -53,6 +63,7 @@ class Store(ABC):
             Value('_tx', 'client', changeset.client),
             Value('_tx', 'created', str(changeset.created)),
             Value('_tx', 'uuid', str(changeset.uuid)),
+            Value('_tx', 'origin', str(changeset.origin)),
             Content(content),
         }
 
@@ -131,4 +142,8 @@ class Store(ABC):
 
     @abstractmethod
     def _get_history(self, ref: Optional[Fact] = None) -> List[Item]:
+        pass
+
+    @abstractmethod
+    def _get_last_ingested_changeset(self, dbuuid: str) -> int:
         pass

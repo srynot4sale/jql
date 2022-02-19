@@ -52,6 +52,23 @@ class Transaction:
     def is_closed(self) -> bool:
         return self.closed is True
 
+    def _add_change(self, change: Change) -> None:
+        if not self.created:
+            raise Exception("Transaction not started")
+
+        if not self.changeset:
+            self.changeset = ChangeSet(
+                uuid=str(uuid.uuid4()),
+                origin=self._store.uuid,
+                origin_rowid=0,
+                client=self._client.ref,
+                created=self.created,
+                query=self.query,
+                changes=[]
+            )
+
+        self.changeset.changes.append(change)
+
     def create_item(self, facts: Iterable[Fact]) -> None:
         if not facts:
             raise Exception("No data supplied")
@@ -97,21 +114,6 @@ class Transaction:
         self.start()
         self.log.msg("tx.get_changesets()")
         self.add_response(self._store.get_changesets())
-
-    def _add_change(self, change: Change) -> None:
-        if not self.created:
-            raise Exception("Transaction not started")
-
-        if not self.changeset:
-            self.changeset = ChangeSet(
-                uuid=str(uuid.uuid4()),
-                client=self._client.ref,
-                created=self.created,
-                query=self.query,
-                changes=[]
-            )
-
-        self.changeset.changes.append(change)
 
     def _get_item(self, ref: Fact) -> Item:
         if not is_ref(ref):
