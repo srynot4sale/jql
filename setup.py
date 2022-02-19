@@ -16,6 +16,7 @@ setup(name='jql',
           'prompt_toolkit',
           'pynamodb',
           'huey',
-          'gevent'
+          'gevent',
+          'lupa'
       ],
       zip_safe=False)
