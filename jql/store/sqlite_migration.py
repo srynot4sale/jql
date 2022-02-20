@@ -226,19 +226,19 @@ def data_migration(conn: sqlite3.Connection) -> None:
             if c['changes']:
                 changes = json.loads(c['changes'])
             else:
-                print('Loading changes from old changes table')
+                print('No changes!')
                 # Get changes
-                changes = []
-                for ch in cur.execute("SELECT rowid, * FROM changes WHERE changeset = ? ORDER BY rowid ASC", [rowid]):
-                    changes.append({
-                        'ref': ch['ref'],
-                        'uuid': ch['uuid'],
-                        'revoke': ch['revoke'],
-                        'facts': json.loads(ch['facts'])
-                    })
+                # changes = []
+                # for ch in cur.execute("SELECT rowid, * FROM changes WHERE changeset = ? ORDER BY rowid ASC", [rowid]):
+                #    changes.append({
+                #        'ref': ch['ref'],
+                #        'uuid': ch['uuid'],
+                #        'revoke': ch['revoke'],
+                #        'facts': json.loads(ch['facts'])
+                #    })
 
-                changes_json = json.dumps(changes)
-                cur.execute('UPDATE changesets SET changes = ? WHERE rowid = ?', (changes_json, rowid))
+                # changes_json = json.dumps(changes)
+                # cur.execute('UPDATE changesets SET changes = ? WHERE rowid = ?', (changes_json, rowid))
             if not origin:
                 print('Adding missing origin field to changeset')
                 cur.execute('UPDATE changesets SET origin = ? WHERE rowid = ?', (config['salt'], rowid))
