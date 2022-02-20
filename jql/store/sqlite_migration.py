@@ -1,4 +1,3 @@
-import json
 import sqlite3
 import sys
 from typing import Any, Dict, List
@@ -223,9 +222,8 @@ def data_migration(conn: sqlite3.Connection) -> None:
             created = c['created']
             client = c['client']
             origin = c['origin']
-            if c['changes']:
-                changes = json.loads(c['changes'])
-            else:
+
+            if not c['changes']:
                 print('No changes!')
                 # Get changes
                 # changes = []
@@ -239,6 +237,7 @@ def data_migration(conn: sqlite3.Connection) -> None:
 
                 # changes_json = json.dumps(changes)
                 # cur.execute('UPDATE changesets SET changes = ? WHERE rowid = ?', (changes_json, rowid))
+
             if not origin:
                 print('Adding missing origin field to changeset')
                 cur.execute('UPDATE changesets SET origin = ? WHERE rowid = ?', (config['salt'], rowid))

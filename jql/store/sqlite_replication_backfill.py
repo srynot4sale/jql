@@ -1,12 +1,9 @@
-import jql.client
+import jql.client  # noqa
 
 import datetime
 import json
-import logging
-import sqlite3
 import sys
 import time
-from typing import Any, Dict, List
 
 from pynamodb.models import Model
 from pynamodb.attributes import (UnicodeAttribute, NumberAttribute, UTCDateTimeAttribute)
@@ -30,7 +27,7 @@ class ReplicatedChangesets(Model):
     content = UnicodeAttribute()
 
 
-def backfill_replication(store: SqliteStore, sleep_secs) -> None:
+def backfill_replication(store: SqliteStore, sleep_secs: float) -> None:
     cur = store._conn.cursor()
     res = cur.execute('SELECT rowid, client, created, query, changes, origin, origin_rowid, uuid FROM changesets WHERE origin = ? ORDER BY rowid', (store.uuid,))
     for cs in res:
