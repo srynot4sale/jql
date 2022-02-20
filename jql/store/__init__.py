@@ -82,7 +82,7 @@ class Store(ABC):
                 else:
                     resp.append(self._update_item(cs_ref, change.ref, change.facts))
             elif change.uid:
-                if has_flag(iter(facts), '_db', 'created'):
+                if has_flag(iter(change.facts), '_db', 'created'):
                     created = get_created_time(iter(change.facts))
                 else:
                     facts.add(Value('_db', 'created', str(changeset.created)))
