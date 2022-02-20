@@ -2,6 +2,7 @@ FROM python:3.8-slim
 
 MAINTAINER Aaron Barnes <aaron@io.nz>
 
+ENV PYTHONUNBUFFERED 1
 ENV PYTHONPATH="/code/:/code/vendor/:${PYTHONPATH}"
 
 RUN mkdir /code

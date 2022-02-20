@@ -6,6 +6,7 @@ RUN apt-get update && \
     apt-get upgrade -y && \
     apt-get install -y python3-pip python3-dev
 
+ENV PYTHONUNBUFFERED 1
 ENV PYTHONPATH="/code/:/code/vendor/:${PYTHONPATH}"
 ENV MYPYPATH="/code/:/code/vendor/"
 ENV DEBUG=1
