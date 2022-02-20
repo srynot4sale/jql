@@ -8,7 +8,7 @@ from typing import List, Optional, Iterable, Set, Tuple
 import uuid
 
 
-from jql.types import Content, Fact, get_created_time, Item, is_ref, Ref, Tag, Value
+from jql.types import Content, Fact, get_created_time, has_flag, Item, is_ref, Ref, Tag, Value
 from jql.changeset import ChangeSet
 
 
@@ -82,7 +82,10 @@ class Store(ABC):
                 else:
                     resp.append(self._update_item(cs_ref, change.ref, change.facts))
             elif change.uid:
-                created = get_created_time(iter(change.facts))
+                if has_flag(iter(facts), '_db', 'created'):
+                    created = get_created_time(iter(change.facts))
+                else:
+                    facts.add(Value('_db', 'created', str(changeset.created)))
                 new_ref, _ = self._next_ref(change.uid, created=created.value)
                 new_item = Item(facts=frozenset(change.facts.union({new_ref})))
                 resp.append(self._create_item(cs_ref, new_item))
