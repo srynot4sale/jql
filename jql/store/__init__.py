@@ -2,13 +2,16 @@ from abc import ABC, abstractmethod
 from hashids import Hashids  # type: ignore
 import datetime
 import json
+from lupa import LuaRuntime  # type: ignore
 import string
 import os
 from typing import List, Optional, Iterable, Set, Tuple
 import uuid
 
 
-from jql.types import Content, Fact, get_created_time, has_flag, Item, is_ref, Ref, Tag, Value
+from jql.client import Client
+from jql.transaction import Transaction
+from jql.types import Content, Fact, Flag, get_content, get_created_time, get_fact, get_ref, has_flag, Item, is_ref, Ref, Tag, Value
 from jql.changeset import ChangeSet
 
 
@@ -98,6 +101,33 @@ class Store(ABC):
 
     def id_to_ref(self, i: int) -> Fact:
         return Ref(self._hashstore.encode(i))
+
+    def run_functions(self) -> None:
+        class luajql:
+            def __init__(self, client: 'Client') -> None:
+                self.client = client
+                self.Fact = Fact
+                self.Tag = Tag
+
+            def get_tx(self) -> Transaction:
+                return self.client.new_transaction()
+
+        funcs = self.get_items([Flag('_func', 'execute')])
+        for func in funcs:
+            fref = get_ref(func)
+            client = Client(self, f'func:{fref}')
+            code = f'function(Jql, ref, item)\n{get_content(func).value}\nend'
+            items = client.read(get_fact(func, '_func', 'filter').value)
+            for item in items:
+                lua = LuaRuntime(
+                    register_eval=False,
+                    unpack_returned_tuples=False,
+                    register_builtins=False
+                )
+                lfunc = lua.eval(code)
+                res = lfunc(luajql(client), get_ref(item), item)
+                if res:
+                    res.commit()
 
     @abstractmethod
     def _get_tags_as_items(self, prefix: str = '') -> List[Item]:

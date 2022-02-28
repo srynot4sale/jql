@@ -1,6 +1,7 @@
 from __future__ import annotations
 import datetime
 import lark.exceptions
+from lupa import lua_type  # type: ignore
 import structlog
 from typing import Iterable, List, Optional, Tuple, TYPE_CHECKING
 import uuid
@@ -84,9 +85,12 @@ class Transaction:
     def update_item(self, ref: Fact, facts: Iterable[Fact], revoke: bool = False) -> None:
         if not facts:
             raise Exception("No data supplied")
+        if lua_type(facts) == 'table':
+            facts = facts.values()  # type: ignore
+        facts = set(facts)
         self.start()
         self.log.msg("tx.update_item()", ref=ref, facts=facts, revoke=revoke)
-        self._add_change(Change(ref=ref, facts=set(facts), revoke=revoke))
+        self._add_change(Change(ref=ref, facts=facts, revoke=revoke))
 
     def get_item(self, ref: Fact) -> None:
         self.start()
