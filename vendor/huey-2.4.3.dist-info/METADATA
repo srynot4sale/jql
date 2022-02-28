@@ -21,6 +21,7 @@ Classifier: Programming Language :: Python :: 3.7
 Classifier: Programming Language :: Python :: 3.8
 Classifier: Programming Language :: Python :: 3.9
 Classifier: Programming Language :: Python :: 3.10
+License-File: LICENSE
 Provides-Extra: backends
 Requires-Dist: redis (>=3.0.0) ; extra == 'backends'
 Provides-Extra: redis

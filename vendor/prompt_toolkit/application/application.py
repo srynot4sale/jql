@@ -41,6 +41,7 @@ from typing import (
 from prompt_toolkit.buffer import Buffer
 from prompt_toolkit.cache import SimpleCache
 from prompt_toolkit.clipboard import Clipboard, InMemoryClipboard
+from prompt_toolkit.cursor_shapes import AnyCursorShapeConfig, to_cursor_shape_config
 from prompt_toolkit.data_structures import Size
 from prompt_toolkit.enums import EditingMode
 from prompt_toolkit.eventloop import (
@@ -216,6 +217,7 @@ class Application(Generic[_AppResult]):
         max_render_postpone_time: Union[float, int, None] = 0.01,
         refresh_interval: Optional[float] = None,
         terminal_size_polling_interval: Optional[float] = 0.5,
+        cursor: AnyCursorShapeConfig = None,
         on_reset: Optional["ApplicationEventHandler[_AppResult]"] = None,
         on_invalidate: Optional["ApplicationEventHandler[_AppResult]"] = None,
         before_render: Optional["ApplicationEventHandler[_AppResult]"] = None,
@@ -265,6 +267,8 @@ class Application(Generic[_AppResult]):
         self.max_render_postpone_time = max_render_postpone_time
         self.refresh_interval = refresh_interval
         self.terminal_size_polling_interval = terminal_size_polling_interval
+
+        self.cursor = to_cursor_shape_config(cursor)
 
         # Events.
         self.on_invalidate = Event(self, on_invalidate)
@@ -579,8 +583,7 @@ class Application(Generic[_AppResult]):
         # (All controls are able to invalidate themselves.)
         def gather_events() -> Iterable[Event[object]]:
             for c in self.layout.find_all_controls():
-                for ev in c.get_invalidate_events():
-                    yield ev
+                yield from c.get_invalidate_events()
 
         self._invalidate_events = list(gather_events())
 
@@ -955,7 +958,7 @@ class Application(Generic[_AppResult]):
                 # but don't use logger. (This works better on Python 2.)
                 print("\nUnhandled exception in event loop:")
                 print(formatted_tb)
-                print("Exception %s" % (context.get("exception"),))
+                print("Exception {}".format(context.get("exception")))
 
                 await _do_wait_for_enter("Press ENTER to continue...")
 
@@ -1252,10 +1255,8 @@ class Application(Generic[_AppResult]):
 
         if attrs_for_style:
             return sorted(
-                [
-                    re.sub(r"\s+", " ", style_str).strip()
-                    for style_str in attrs_for_style.keys()
-                ]
+                re.sub(r"\s+", " ", style_str).strip()
+                for style_str in attrs_for_style.keys()
             )
 
         return []

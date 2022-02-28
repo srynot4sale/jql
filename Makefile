@@ -15,12 +15,12 @@ build: ## Build api image
 
 .PHONY: vendorize
 vendorize: ## Update vendorized dependencies
-	pip3 install --isolated --upgrade -t ./vendor -r requirements.txt
+	venv/bin/pip install --isolated --upgrade -t ./vendor -r requirements.txt
 
 .PHONY: venv
 venv: ## Update virtualenv
-	virtualenv -p $$(which python3.8) venv
-	venv/bin/pip install --upgrade pip
+	$$(which python3.10) -m venv venv
+	venv/bin/pip install --upgrade pip wheel
 	venv/bin/pip install --upgrade -r requirements.txt
 	venv/bin/pip install --upgrade -r requirements-test.txt
 

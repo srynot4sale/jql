@@ -2,11 +2,12 @@ from abc import ABC, abstractmethod
 import sys, os, pickle, hashlib
 import tempfile
 from typing import (
-    TypeVar, Type, List, Dict, Iterator, Callable, Union, Optional,
+    TypeVar, Type, List, Dict, Iterator, Callable, Union, Optional, Sequence,
     Tuple, Iterable, IO, Any, TYPE_CHECKING, Collection
 )
 if TYPE_CHECKING:
     from .parsers.lalr_interactive_parser import InteractiveParser
+    from .tree import ParseTree
     from .visitors import Transformer
     if sys.version_info >= (3, 8):
         from typing import Literal
@@ -169,6 +170,7 @@ class LarkOptions(Serialize):
         'use_bytes': False,
         'import_paths': [],
         'source_path': None,
+        '_plugins': {},
     }
 
     def __init__(self, options_dict):
@@ -219,14 +221,14 @@ class LarkOptions(Serialize):
 
 
 # Options that can be passed to the Lark parser, even when it was loaded from cache/standalone.
-# These option are only used outside of `load_grammar`.
-_LOAD_ALLOWED_OPTIONS = {'postlex', 'transformer', 'lexer_callbacks', 'use_bytes', 'debug', 'g_regex_flags', 'regex', 'propagate_positions', 'tree_class'}
+# These options are only used outside of `load_grammar`.
+_LOAD_ALLOWED_OPTIONS = {'postlex', 'transformer', 'lexer_callbacks', 'use_bytes', 'debug', 'g_regex_flags', 'regex', 'propagate_positions', 'tree_class', '_plugins'}
 
 _VALID_PRIORITY_OPTIONS = ('auto', 'normal', 'invert', None)
 _VALID_AMBIGUITY_OPTIONS = ('auto', 'resolve', 'explicit', 'forest')
 
 
-_T = TypeVar('_T')
+_T = TypeVar('_T', bound="Lark")
 
 class Lark(Serialize):
     """Main interface for the library.
@@ -291,7 +293,7 @@ class Lark(Serialize):
                 if self.options.parser != 'lalr':
                     raise ConfigurationError("cache only works with parser='lalr' for now")
 
-                unhashable = ('transformer', 'postlex', 'lexer_callbacks', 'edit_terminals')
+                unhashable = ('transformer', 'postlex', 'lexer_callbacks', 'edit_terminals', '_plugins')
                 options_str = ''.join(k+str(v) for k, v in options.items() if k not in unhashable)
                 from . import __version__
                 s = grammar + options_str + __version__ + str(sys.version_info[:2])
@@ -540,7 +542,7 @@ class Lark(Serialize):
             return cls(f, **options)
 
     @classmethod
-    def open_from_package(cls: Type[_T], package: str, grammar_path: str, search_paths: Tuple[str, ...]=("",), **options) -> _T:
+    def open_from_package(cls: Type[_T], package: str, grammar_path: str, search_paths: 'Sequence[str]'=[""], **options) -> _T:
         """Create an instance of Lark with the grammar loaded from within the package `package`.
         This allows grammar loading from zipapps.
 
@@ -596,7 +598,7 @@ class Lark(Serialize):
         """
         return self.parser.parse_interactive(text, start=start)
 
-    def parse(self, text: str, start: Optional[str]=None, on_error: 'Optional[Callable[[UnexpectedInput], bool]]'=None) -> Tree:
+    def parse(self, text: str, start: Optional[str]=None, on_error: 'Optional[Callable[[UnexpectedInput], bool]]'=None) -> 'ParseTree':
         """Parse the given text, according to the options provided.
 
         Parameters:

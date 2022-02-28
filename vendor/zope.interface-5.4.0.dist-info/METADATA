@@ -25,6 +25,7 @@ Classifier: Programming Language :: Python :: Implementation :: PyPy
 Classifier: Framework :: Zope :: 3
 Classifier: Topic :: Software Development :: Libraries :: Python Modules
 Requires-Python: >=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*
+License-File: LICENSE.txt
 Requires-Dist: setuptools
 Provides-Extra: docs
 Requires-Dist: Sphinx ; extra == 'docs'
