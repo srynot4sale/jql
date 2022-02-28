@@ -124,6 +124,8 @@ def is_flag(fact: Fact) -> bool:
 
 
 def Tag(tag: str) -> Fact:
+    if tag.startswith('#'):
+        raise Exception('Strip off the # when using the Tag() function')
     return Fact(tag=tag, prop="", value="")
 
 
