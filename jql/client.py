@@ -2,13 +2,15 @@ import logging
 import structlog
 from structlog.stdlib import LoggerFactory
 import sys
-from typing import List
+from typing import ClassVar, List, TYPE_CHECKING
 
 from gevent import monkey  # type: ignore
 monkey.patch_all()
 
 
-from jql.store import Store  # noqa: E402
+if TYPE_CHECKING:
+    from jql.store import Store
+
 from jql.types import Item  # noqa: E402
 from jql.transaction import Transaction  # noqa: E402
 
@@ -17,19 +19,19 @@ class Client:
     ref: str
     name: str
     user: str
-    store: Store
+    store: 'Store'
 
-    _stores: List[Store] = []
+    _stores: ClassVar[List['Store']] = []
 
     @classmethod
-    def get_stores(cls) -> List[Store]:
+    def get_stores(cls) -> List['Store']:
         return cls._stores
 
     @classmethod
-    def add_store(cls, store: Store) -> None:
+    def add_store(cls, store: 'Store') -> None:
         cls._stores.append(store)
 
-    def __init__(self, store: Store, client: str, log_level: int = logging.INFO):
+    def __init__(self, store: 'Store', client: str, log_level: int = logging.INFO):
         self.ref = client
         self.name, self.user = client.split(':')
         self.store = store
