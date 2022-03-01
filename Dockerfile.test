@@ -1,4 +1,4 @@
-FROM python:3.8-slim
+FROM python:3.10-slim
 
 MAINTAINER Aaron Barnes <aaron@io.nz>
 
@@ -16,7 +16,7 @@ WORKDIR /code
 
 ADD requirements-test.txt /tmp/
 
-RUN pip install --upgrade pip
+RUN pip install --upgrade pip wheel
 RUN pip install -r /tmp/requirements-test.txt
 
 CMD ["/code/test.sh"]

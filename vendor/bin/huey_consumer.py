@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/home/abarnes/code/jql/venv/bin/python3.10
 
 import logging
 import os

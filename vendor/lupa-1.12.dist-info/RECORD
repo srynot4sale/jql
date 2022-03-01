@@ -1,0 +1,12 @@
+lupa-1.12.dist-info/INSTALLER,sha256=zuuue4knoyJ-UwPPXg8fezS7VCrXJQrAP7zeNuwvFQg,4
+lupa-1.12.dist-info/LICENSE.txt,sha256=lXr-SRPfxGn9YFQdhHpYHFvd1roMy3I5DteMdYN3aKE,2231
+lupa-1.12.dist-info/METADATA,sha256=WMnOfI9p0XeKFVg7AzPluKVpem8uE1MI8UxYCj7_YOA,50829
+lupa-1.12.dist-info/RECORD,,
+lupa-1.12.dist-info/REQUESTED,sha256=47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU,0
+lupa-1.12.dist-info/WHEEL,sha256=T4oR4cxOVd3mnWgLH1ISVb645GwUVo3c1Oy2pJFAkXo,191
+lupa-1.12.dist-info/top_level.txt,sha256=zBjq_OEwVlKBUT25L2ENcMO-9XdwVQSN7X6VHyH7Pcg,5
+lupa/__init__.py,sha256=Kbox_9wM08AAjI81Yisp1CysKgPfEZrGiT1tqVoGCo4,878
+lupa/__pycache__/__init__.cpython-310.pyc,,
+lupa/__pycache__/version.cpython-310.pyc,,
+lupa/_lupa.cpython-310-x86_64-linux-gnu.so,sha256=dNQR9YOvlp7AnP1yshrwJv2Y4iFui3QMj6IynQK8-YM,651360
+lupa/version.py,sha256=aozSbborcleM3raH-xN8MKH4xviRohwGN-RPI2WOh1E,21

@@ -16,6 +16,7 @@
 This module contains builtin handlers for events emitted by botocore.
 """
 
+import os
 import base64
 import logging
 import copy
@@ -26,7 +27,7 @@ import uuid
 from botocore.compat import (
     unquote, json, six, unquote_str, ensure_bytes, get_md5,
     OrderedDict, urlsplit, urlunsplit, XMLParseError,
-    ETree,
+    ETree, quote,
 )
 from botocore.docs.utils import AutoPopulatedParam
 from botocore.docs.utils import HideParamFromOperations
@@ -84,6 +85,15 @@ def handle_service_name_alias(service_name, **kwargs):
     return SERVICE_NAME_ALIASES.get(service_name, service_name)
 
 
+def add_recursion_detection_header(params, **kwargs):
+    has_lambda_name = 'AWS_LAMBDA_FUNCTION_NAME' in os.environ
+    trace_id = os.environ.get('_X_AMZ_TRACE_ID')
+    if has_lambda_name and trace_id:
+        headers = params['headers']
+        if 'X-Amzn-Trace-Id' not in headers:
+            headers['X-Amzn-Trace-Id'] = quote(trace_id)
+
+
 def escape_xml_payload(params, **kwargs):
     # Replace \r and \n with the escaped sequence over the whole XML document
     # to avoid linebreak normalization modifying customer input when the
@@ -92,22 +102,12 @@ def escape_xml_payload(params, **kwargs):
     # this operation \r and \n can only appear in the XML document if they were
     # passed as part of the customer input.
     body = params['body']
-    replaced = False
     if b'\r' in body:
-        replaced = True
         body = body.replace(b'\r', b'&#xD;')
     if b'\n' in body:
-        replaced = True
         body = body.replace(b'\n', b'&#xA;')
 
-    if not replaced:
-        return
-
     params['body'] = body
-    if 'Content-MD5' in params['headers']:
-        # The Content-MD5 is now wrong, so we'll need to recalculate it
-        del params['headers']['Content-MD5']
-        conditionally_calculate_md5(params, **kwargs)
 
 
 def check_for_200_error(response, **kwargs):
@@ -943,6 +943,21 @@ def remove_lex_v2_start_conversation(class_attributes, **kwargs):
         del class_attributes['start_conversation']
 
 
+def add_retry_headers(request, **kwargs):
+    retries_context = request.context.get('retries')
+    if not retries_context:
+        return
+    headers = request.headers
+    headers['amz-sdk-invocation-id'] = retries_context['invocation-id']
+    sdk_retry_keys = ('ttl', 'attempt', 'max')
+    sdk_request_headers = [
+        f'{key}={retries_context[key]}'
+        for key in sdk_retry_keys
+        if key in retries_context
+    ]
+    headers['amz-sdk-request'] = '; '.join(sdk_request_headers)
+
+
 # This is a list of (event_name, handler).
 # When a Session is created, everything in this list will be
 # automatically registered with that Session.
@@ -986,6 +1001,7 @@ BUILTIN_HANDLERS = [
     ('docs.*.s3.CopyObject.complete-section', document_copy_source_form),
     ('docs.*.s3.UploadPartCopy.complete-section', document_copy_source_form),
 
+    ('before-call', add_recursion_detection_header),
     ('before-call.s3', add_expect_header),
     ('before-call.glacier', add_glacier_version),
     ('before-call.apigateway', add_accept_header),
@@ -996,6 +1012,7 @@ BUILTIN_HANDLERS = [
     ('before-call.glacier.UploadArchive', add_glacier_checksums),
     ('before-call.glacier.UploadMultipartPart', add_glacier_checksums),
     ('before-call.ec2.CopySnapshot', inject_presigned_url_ec2),
+    ('request-created', add_retry_headers),
     ('request-created.machinelearning.Predict', switch_host_machinelearning),
     ('needs-retry.s3.UploadPartCopy', check_for_200_error, REGISTER_FIRST),
     ('needs-retry.s3.CopyObject', check_for_200_error, REGISTER_FIRST),

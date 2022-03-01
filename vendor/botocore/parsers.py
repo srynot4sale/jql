@@ -259,7 +259,14 @@ class ResponseParser(object):
             headers = response['headers']
             response_metadata['HTTPHeaders'] = lowercase_dict(headers)
             parsed['ResponseMetadata'] = response_metadata
+            self._add_checksum_response_metadata(response, response_metadata)
         return parsed
+
+    def _add_checksum_response_metadata(self, response, response_metadata):
+        checksum_context = response.get('context', {}).get('checksum', {})
+        algorithm = checksum_context.get('response_algorithm')
+        if algorithm:
+            response_metadata['ChecksumAlgorithm'] = algorithm
 
     def _is_modeled_error_shape(self, shape):
         return shape is not None and shape.metadata.get('exception', False)
@@ -974,6 +981,11 @@ class RestJSONParser(BaseRestParser, BaseJSONParser):
         elif 'code' in body or 'Code' in body:
             error['Error']['Code'] = body.get(
                 'code', body.get('Code', ''))
+
+    def _handle_integer(self, shape, value):
+        return int(value)
+
+    _handle_long = _handle_integer
 
 
 class RestXMLParser(BaseRestParser, BaseXMLResponseParser):
