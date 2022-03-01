@@ -125,12 +125,9 @@ def ingest_replication() -> None:
                     cid = store.record_changeset(changeset)
                     store.apply_changeset(cid)
                     task_log.warning(f'Ingested changeset {item.changeset_rowid} - {repr(content)}')
-                    last = int(item.changeset_rowid)
-
-                LAST_INGESTED[stuuid][sourceid] = last
-
-            INGEST_LOCK.release()
+                    LAST_INGESTED[stuuid][sourceid] = int(item.changeset_rowid)
 
     except BaseException as e:
-        INGEST_LOCK.release()
         task_log.exception(e)
+    finally:
+        INGEST_LOCK.release()
