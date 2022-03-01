@@ -54,7 +54,7 @@ class Store(ABC):
 
         # Commit changeset
         cs_ref, _ = self._next_ref(changeset.uuid, created=str(changeset.created), changeset=True)
-        content = json.dumps([c.to_dict() for c in changeset.changes])
+        content = json.dumps(changeset.changes_as_dict())
 
         facts = {
             cs_ref,
