@@ -255,8 +255,8 @@ class SqliteStore(Store):
         )
 
         for c in json.loads(cs[4]):
-            ref = Ref(c['ref']) if c['ref'] else None
-            uid = c['uid'] if c['uid'] else None
+            ref = Ref(c['ref']) if c.get('ref') else None
+            uid = c['uid'] if c.get('uid') else None
             revoke = c['revoke']
             facts = {fact_from_dict(fact) for fact in c['facts']}
 

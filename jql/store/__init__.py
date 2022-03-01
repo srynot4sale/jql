@@ -75,22 +75,24 @@ class Store(ABC):
 
         resp: List[Item] = []
         for change in changeset.changes:
-            # create change
+            # If ref, we're updating/revoking
             if change.ref:
                 if change.revoke:
                     resp.append(self._revoke_item_facts(cs_ref, change.ref, change.facts))
                 else:
                     resp.append(self._update_item(cs_ref, change.ref, change.facts))
+            # If uid, we're creating a new item
             elif change.uid:
-                if has_flag(iter(change.facts), '_db', 'created'):
-                    created = get_created_time(iter(change.facts))
-                else:
+                # Older changesets didn't include created times
+                if not has_flag(iter(change.facts), '_db', 'created'):
                     facts.add(Value('_db', 'created', str(changeset.created)))
+
+                created = get_created_time(iter(change.facts))
                 new_ref, _ = self._next_ref(change.uid, created=created.value)
                 new_item = Item(facts=frozenset(change.facts.union({new_ref})))
                 resp.append(self._create_item(cs_ref, new_item))
             else:
-                raise Exception("Unexpected Change format")
+                raise Exception("Unexpected change format")
         return resp
 
     def ref_to_id(self, ref: Fact) -> int:
