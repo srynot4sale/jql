@@ -14,6 +14,7 @@ from jql.types import Content, Fact, Flag, Item, Ref, Value, is_tag, is_flag, is
 class SqliteStore(Store):
     def __init__(self, location: str = ":memory:", salt: str = "") -> None:
         self._conn = sqlite3.connect(location)
+        self._conn.row_factory = sqlite3.Row
 
         cur = self._conn.cursor()
         current_version = cur.execute('pragma user_version').fetchone()[0]
@@ -27,7 +28,7 @@ class SqliteStore(Store):
         cur.execute("SELECT val FROM config WHERE key='salt'")
         existing_salt = cur.fetchone()
         if existing_salt:
-            super().__init__(existing_salt[0])
+            super().__init__(existing_salt["val"])
         else:
             # Run initial Setup with supplied salt (or generate one)
             super().__init__(salt)
@@ -73,7 +74,7 @@ class SqliteStore(Store):
         cur = self._conn.cursor()
         facts: Set[Fact] = set()
         for row in cur.execute('SELECT tag, prop, val, tx_ref FROM current_facts_inc_tx WHERE ref = ?', [ref.value]):
-            facts.add(Fact(tag=row[0], prop=row[1], value=row[2], tx=row[3]))
+            facts.add(Fact(tag=row["tag"], prop=row["prop"], value=row["val"], tx=row["tx_ref"]))
         if len(facts) == 0:
             return None
         return Item(facts=facts)
@@ -112,7 +113,7 @@ class SqliteStore(Store):
 
         cur = self._conn.cursor()
         items_sql = '''
-        SELECT c.dbid, c.tag, c.prop, c.val, c.tx_ref
+        SELECT c.dbid AS dbid, c.tag AS tag, c.prop AS prop, c.val AS val, c.tx_ref AS tx_ref
         FROM current_facts c
         '''
         for w in where:
@@ -124,11 +125,11 @@ class SqliteStore(Store):
 
         facts = {}  # type: ignore
         for row in cur.execute(items_sql, d):
-            if row[0] not in facts.keys():
+            if row["dbid"] not in facts.keys():
                 if len(facts) >= 100:
                     break
-                facts[row[0]] = set()
-            facts[row[0]].add(Fact(tag=row[1], prop=row[2], value=row[3], tx=row[4]))
+                facts[row["dbid"]] = set()
+            facts[row["dbid"]].add(Fact(tag=row["tag"], prop=row["prop"], value=row["val"], tx=row["tx_ref"]))
 
         for fs in facts.values():
             matches.append(Item(facts=fs))
@@ -200,11 +201,11 @@ class SqliteStore(Store):
         return [Item(facts={t[0], Value('_db', 'count', t[1])}) for t in tags]
 
     def _get_props_as_items(self, tag: str, prefix: str = '') -> List[Item]:
-        props: List[Tuple[Fact, str]] = []
+        props: List[Item] = []
 
         cur = self._conn.cursor()
         props_sql = '''
-            SELECT prop, COUNT(DISTINCT dbid)
+            SELECT prop, COUNT(DISTINCT dbid) AS c
             FROM current_facts
             WHERE tag = ? AND prop != ""
         '''
@@ -221,9 +222,8 @@ class SqliteStore(Store):
         '''
 
         for row in cur.execute(props_sql, params):
-            props.append((Flag(tag, row[0]), str(row[1])))
-
-        return [Item(facts={t[0], Value('_db', 'count', t[1])}) for t in props]
+            props.append(Item(facts={Flag(tag, row["prop"]), Value('_db', 'count', str(row["c"]))}))
+        return props
 
     def _record_changeset(self, changeset: ChangeSet) -> str:
         cur = self._conn.cursor()
@@ -239,22 +239,22 @@ class SqliteStore(Store):
 
     def _load_changeset(self, changeset_uuid: str) -> ChangeSet:
         cur = self._conn.cursor()
-        cur.execute('SELECT rowid, client, created, query, changes, origin, origin_rowid FROM changesets WHERE uuid = ?', (changeset_uuid,))
+        cur.execute('SELECT client, created, query, changes, origin, origin_rowid FROM changesets WHERE uuid = ?', (changeset_uuid,))
         cs = cur.fetchone()
         if not cs:
             raise Exception(f'Could not find changeset {changeset_uuid}')
 
         changeset = ChangeSet(
             uuid=changeset_uuid,
-            client=cs[1],
-            created=cs[2],
-            query=cs[3],
-            origin=cs[5],
-            origin_rowid=cs[6],
+            client=cs["client"],
+            created=cs["created"],
+            query=cs["query"],
+            origin=cs["origin"],
+            origin_rowid=cs["origin_rowid"],
             changes=[]
         )
 
-        for c in json.loads(cs[4]):
+        for c in json.loads(cs["changes"]):
             ref = Ref(c['ref']) if c.get('ref') else None
             uid = c['uid'] if c.get('uid') else None
             revoke = c['revoke']
@@ -288,9 +288,9 @@ class SqliteStore(Store):
         sets: List[Item] = []
         facts = {}  # type: ignore
         for row in cur.execute(cs_sql):
-            if row[0] not in facts.keys():
-                facts[row[0]] = set()
-            facts[row[0]].add(Fact(row[1], row[2], row[3]))
+            if row["dbid"] not in facts.keys():
+                facts[row["dbid"]] = set()
+            facts[row["dbid"]].add(Fact(row["tag"], row["prop"], row["val"]))
 
         for fs in facts.values():
             sets.append(Item(facts=fs))
@@ -302,7 +302,7 @@ class SqliteStore(Store):
 
         cs_params = []
         cs_sql = '''
-            SELECT i.ref, f.tag, f.prop, f.val, f.revoke, t.ref AS tx_ref, t.created AS tx_created
+            SELECT i.ref AS ref, f.tag AS tag, f.prop AS prop, f.val AS val, f.revoke AS revoke, t.ref AS tx_ref, t.created AS tx_created
             FROM facts f
             INNER JOIN items i
                ON i.rowid = f.dbid
@@ -335,15 +335,15 @@ class SqliteStore(Store):
         sets: List[Item] = []
         for row in cur.execute(cs_sql, cs_params):
             if not ref:
-                desc = f'@{row[0]}: '
+                desc = f'@{row["ref"]}: '
             else:
                 desc = ''
-            desc += 'Added ' if not row[4] else 'Revoked '
-            desc += repr(Fact(row[1], row[2], row[3]))
+            desc += 'Added ' if not row["revoke"] else 'Revoked '
+            desc += repr(Fact(row["tag"], row["prop"], row["val"]))
             facts = {
-                Ref(row[5]),
+                Ref(row["tx_ref"]),
                 Content(desc),
-                Value('_db', 'created', row[6])
+                Value('_db', 'created', row["tx_created"])
             }
 
             sets.append(Item(facts=facts))
@@ -352,5 +352,5 @@ class SqliteStore(Store):
 
     def _get_last_ingested_changeset(self, dbuuid: str) -> int:
         cur = self._conn.cursor()
-        cs = cur.execute('SELECT MAX(origin_rowid) FROM changesets WHERE origin = ? GROUP BY origin', (dbuuid,)).fetchone()
-        return 0 if not cs else int(cs[0])
+        cs = cur.execute('SELECT MAX(origin_rowid) AS max FROM changesets WHERE origin = ? GROUP BY origin', (dbuuid,)).fetchone()
+        return 0 if not cs else int(cs["max"])
