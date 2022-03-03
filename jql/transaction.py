@@ -81,12 +81,21 @@ class Transaction:
 
         self._add_change(Change(uid=str(uuid.uuid4()), facts=facts))
 
-    def update_item(self, ref: Fact, facts: Iterable[Fact], revoke: bool = False) -> None:
+    def revoke_facts(self, ref: Fact, facts: Iterable[Fact]) -> None:
+        facts = set(facts)
         if not facts:
             raise Exception("No data supplied")
         self.start()
-        self.log.msg("tx.update_item()", ref=ref, facts=facts, revoke=revoke)
-        self._add_change(Change(ref=ref, facts=set(facts), revoke=revoke))
+        self.log.msg("tx.revoke_facts()", ref=ref, facts=facts)
+        self._add_change(Change(ref=ref, facts=facts, revoke=True))
+
+    def set_facts(self, ref: Fact, facts: Iterable[Fact]) -> None:
+        facts = set(facts)
+        if not facts:
+            raise Exception("No data supplied")
+        self.start()
+        self.log.msg("tx.set_facts()", ref=ref, facts=facts)
+        self._add_change(Change(ref=ref, facts=facts))
 
     def get_item(self, ref: Fact) -> None:
         self.start()
@@ -168,8 +177,13 @@ class Transaction:
             self.commit()
             return self.response
 
-        if action in ('set', 'del'):
-            self.update_item(values[0], values[1:], revoke=(action == 'del'))
+        if action == 'set':
+            self.set_facts(values[0], values[1:])
+            self.commit()
+            return self.response
+
+        if action == 'del':
+            self.revoke_facts(values[0], values[1:])
             self.commit()
             return self.response
 

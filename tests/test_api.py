@@ -72,7 +72,7 @@ def test_basic_create_add_tags(db) -> None:
 
     with db.tx() as tx:
         item = {Tag("new")}
-        tx.update_item(ref, item)
+        tx.set_facts(ref, item)
         tx.commit()
 
         db.assert_result(res2)
@@ -82,7 +82,7 @@ def test_basic_create_add_tags(db) -> None:
 
     with db.tx() as tx:
         item = {Tag("another")}
-        tx.update_item(ref, item)
+        tx.set_facts(ref, item)
         tx.commit()
 
         db.assert_result(res3)
@@ -111,7 +111,7 @@ def test_basic_create_add_facts(db) -> None:
 
     with db.tx() as tx:
         item = {Flag("todo", "immediately")}
-        tx.update_item(ref, item)
+        tx.set_facts(ref, item)
         tx.commit()
 
         db.assert_result(res3)
@@ -121,7 +121,7 @@ def test_basic_create_add_facts(db) -> None:
 
     with db.tx() as tx:
         item = {Flag("todo", "nottomorrow")}
-        tx.update_item(ref, item)
+        tx.set_facts(ref, item)
         tx.commit()
 
         db.assert_result(res4)
@@ -158,7 +158,7 @@ def test_basic_tags_normalized(db) -> None:
 
     with db.tx() as tx:
         item = {Tag("new")}
-        tx.update_item(ref, item)
+        tx.set_facts(ref, item)
         tx.commit()
 
         db.assert_result(res3)
@@ -176,7 +176,7 @@ def test_basic_tags_normalized(db) -> None:
 
     with db.tx() as tx:
         item = {Tag("new")}
-        tx.update_item(ref, item)
+        tx.set_facts(ref, item)
         tx.commit()
 
         db.assert_result(res5)
