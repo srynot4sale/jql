@@ -5,10 +5,10 @@ import sqlite3
 from typing import FrozenSet, List, Iterable, Set, Optional, Tuple
 
 
-from jql.changeset import Change, ChangeSet
+from jql.changeset import ChangeSet
 from jql.store import Store
 from jql.tasks import replicate_changeset
-from jql.types import Content, Fact, Flag, Item, Ref, Value, is_tag, is_flag, is_content, get_ref, has_value, Tag, fact_from_dict
+from jql.types import Content, Fact, Flag, Item, Ref, Value, is_tag, is_flag, is_content, get_ref, has_value, Tag
 
 
 class SqliteStore(Store):
@@ -74,7 +74,7 @@ class SqliteStore(Store):
         cur = self._conn.cursor()
         facts: Set[Fact] = set()
         for row in cur.execute('SELECT tag, prop, val, tx_ref FROM current_facts_inc_tx WHERE ref = ?', [ref.value]):
-            facts.add(Fact(tag=row["tag"], prop=row["prop"], value=row["val"], tx=row["tx_ref"]))
+            facts.add(self._fact_from_row(row))
         if len(facts) == 0:
             return None
         return Item(facts=facts)
@@ -129,7 +129,7 @@ class SqliteStore(Store):
                 if len(facts) >= 100:
                     break
                 facts[row["dbid"]] = set()
-            facts[row["dbid"]].add(Fact(tag=row["tag"], prop=row["prop"], value=row["val"], tx=row["tx_ref"]))
+            facts[row["dbid"]].add(self._fact_from_row(row))
 
         for fs in facts.values():
             matches.append(Item(facts=fs))
@@ -176,11 +176,11 @@ class SqliteStore(Store):
         self._conn.commit()
 
     def _get_tags_as_items(self, prefix: str = '') -> List[Item]:
-        tags: List[Tuple[Fact, str]] = []
+        tags: List[Item] = []
 
         cur = self._conn.cursor()
         tags_sql = '''
-            SELECT tag, COUNT(DISTINCT dbid)
+            SELECT tag, COUNT(DISTINCT dbid) AS c
             FROM current_facts
         '''
 
@@ -196,9 +196,8 @@ class SqliteStore(Store):
         '''
 
         for row in cur.execute(tags_sql, params):
-            tags.append((Tag(row[0]), str(row[1])))
-
-        return [Item(facts={t[0], Value('_db', 'count', t[1])}) for t in tags]
+            tags.append(Item(facts={Tag(row["tag"]), Value('_db', 'count', str(row["c"]))}))
+        return tags
 
     def _get_props_as_items(self, tag: str, prefix: str = '') -> List[Item]:
         props: List[Item] = []
@@ -239,35 +238,11 @@ class SqliteStore(Store):
 
     def _load_changeset(self, changeset_uuid: str) -> ChangeSet:
         cur = self._conn.cursor()
-        cur.execute('SELECT client, created, query, changes, origin, origin_rowid FROM changesets WHERE uuid = ?', (changeset_uuid,))
+        cur.execute('SELECT uuid, client, created, query, changes, origin, origin_rowid FROM changesets WHERE uuid = ?', (changeset_uuid,))
         cs = cur.fetchone()
         if not cs:
             raise Exception(f'Could not find changeset {changeset_uuid}')
-
-        changeset = ChangeSet(
-            uuid=changeset_uuid,
-            client=cs["client"],
-            created=cs["created"],
-            query=cs["query"],
-            origin=cs["origin"],
-            origin_rowid=cs["origin_rowid"],
-            changes=[]
-        )
-
-        for c in json.loads(cs["changes"]):
-            ref = Ref(c['ref']) if c.get('ref') else None
-            uid = c['uid'] if c.get('uid') else None
-            revoke = c['revoke']
-            facts = {fact_from_dict(fact) for fact in c['facts']}
-
-            changeset.changes.append(Change(
-                ref=ref,
-                uid=uid,
-                facts=facts,
-                revoke=revoke
-            ))
-
-        return changeset
+        return self._changset_from_row(cs)
 
     def _get_changesets_as_items(self) -> List[Item]:
         cur = self._conn.cursor()
@@ -290,7 +265,7 @@ class SqliteStore(Store):
         for row in cur.execute(cs_sql):
             if row["dbid"] not in facts.keys():
                 facts[row["dbid"]] = set()
-            facts[row["dbid"]].add(Fact(row["tag"], row["prop"], row["val"]))
+            facts[row["dbid"]].add(self._fact_from_row(row))
 
         for fs in facts.values():
             sets.append(Item(facts=fs))
@@ -339,7 +314,7 @@ class SqliteStore(Store):
             else:
                 desc = ''
             desc += 'Added ' if not row["revoke"] else 'Revoked '
-            desc += repr(Fact(row["tag"], row["prop"], row["val"]))
+            desc += repr(self._fact_from_row(row))
             facts = {
                 Ref(row["tx_ref"]),
                 Content(desc),
@@ -354,3 +329,18 @@ class SqliteStore(Store):
         cur = self._conn.cursor()
         cs = cur.execute('SELECT MAX(origin_rowid) AS max FROM changesets WHERE origin = ? GROUP BY origin', (dbuuid,)).fetchone()
         return 0 if not cs else int(cs["max"])
+
+    def _changset_from_row(self, row: sqlite3.Row) -> ChangeSet:
+        changeset = ChangeSet(
+            uuid=row["uuid"],
+            client=row["client"],
+            created=row["created"],
+            query=row["query"],
+            origin=row["origin"],
+            origin_rowid=row["origin_rowid"],
+            changes=ChangeSet.changes_from_dict(json.loads(row["changes"]))
+        )
+        return changeset
+
+    def _fact_from_row(self, row: sqlite3.Row) -> Fact:
+        return Fact(tag=row["tag"], prop=row["prop"], value=row["val"], tx=row["tx_ref"] if "tx_ref" in row else None)

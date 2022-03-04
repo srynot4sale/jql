@@ -23,15 +23,13 @@ class Change:
 
     @classmethod
     def from_dict(cls, c: Dict[str, Any]) -> 'Change':
-        if c.get('ref'):
-            ref = Ref(c['ref'])
-        else:
-            ref = None
+        ref = Ref(c['ref']) if c.get('ref') else None
+        uid = c['uid'] or None
 
         return Change(
             facts={fact_from_dict(f) for f in c.get('facts', [])},
             ref=ref,
-            uid=c.get('uid', None),
+            uid=uid,
             revoke=c.get('revoke', False)
         )
 
