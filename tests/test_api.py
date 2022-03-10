@@ -1,4 +1,6 @@
-from jql.types import Content, Flag, Tag
+import pytest
+
+from jql.types import Content, Flag, Ref, Tag
 
 
 def test_basic_create(db) -> None:
@@ -188,3 +190,25 @@ def test_basic_tags_normalized(db) -> None:
         tx.get_item(ref)
 
         db.assert_result(res6)
+
+
+def test_add_to_nonexistant_item(db) -> None:
+    with db.tx() as tx:
+        item = {Content("do dishes"), Tag("todo"), Tag("chores")}
+        tx.create_item(item)
+        tx.commit()
+
+    ref = db.last_ref
+
+    with db.tx() as tx:
+        item = {Tag("new")}
+        tx.set_facts(ref, item)
+        tx.commit()
+
+        assert ref == db.last_ref
+
+    with db.tx() as tx:
+        item = {Tag("another")}
+
+        with pytest.raises(Exception):
+            tx.set_facts(Ref('343434'), item)
