@@ -2,6 +2,10 @@ FROM python:3.10-slim
 
 MAINTAINER Aaron Barnes <aaron@io.nz>
 
+RUN apt-get update && \
+    apt-get upgrade -y && \
+    apt-get install -y sqlite3
+
 ENV PYTHONUNBUFFERED 1
 ENV PYTHONPATH="/code/:/code/vendor/:${PYTHONPATH}"
 
