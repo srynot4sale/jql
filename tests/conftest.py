@@ -12,6 +12,12 @@ from jql.types import get_ref, Fact, Item, Ref
 from jql.transaction import Transaction
 
 
+# Hack to show more output in assertions
+from _pytest.assertion import truncate
+truncate.DEFAULT_MAX_LINES = 9999
+truncate.DEFAULT_MAX_CHARS = 9999
+
+
 pytest.register_assert_rewrite("generator")
 
 
@@ -57,8 +63,22 @@ class dbclass:
     def assert_result(self, comparison) -> None:  # type: ignore
         if isinstance(comparison, Item):
             comparison = [comparison]
-        assert len(self.resp) == len(comparison)
-        assert [r.as_tuples() for r in self.resp] == [r.as_tuples() for r in comparison]
+        self.compare_results(self.resp, comparison)
+
+    def compare_results(self, res1, res2) -> None:  # type: ignore
+        res1 = [r.as_tuples() for r in res1]
+        res2 = [r.as_tuples() for r in res2]
+        if res1 == res2:
+            return
+        print('***** res1 != res2 *****')
+        print('res1:')
+        for r in res1:
+            pprint.pprint(r)
+        print('res2:')
+        for r in res2:
+            pprint.pprint(r)
+
+        assert res1 == res2
 
 
 @pytest.fixture
