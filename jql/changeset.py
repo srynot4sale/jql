@@ -1,36 +1,30 @@
 from dataclasses import dataclass
 import datetime
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Set
 
 
-from jql.types import Fact, fact_from_dict, Ref
+from jql.types import Fact, fact_from_dict
 
 
 @dataclass()
 class Change:
     facts: Set[Fact]
-    ref: Optional[Fact] = None
-    uid: Optional[str] = None
+    uuid: str
     revoke: bool = False
 
     def to_dict(self) -> Dict[str, Any]:
         return {
-            'facts': [f._asdict() for f in self.facts],
-            'ref': self.ref.value if self.ref else None,
-            'uid': self.uid,
+            'facts': sorted([f._asdict() for f in self.facts], key=repr),
+            'uuid': self.uuid,
             'revoke': self.revoke
         }
 
     @classmethod
     def from_dict(cls, c: Dict[str, Any]) -> 'Change':
-        ref = Ref(c['ref']) if c.get('ref') else None
-        uid = c['uid'] or None
-
         return Change(
             facts={fact_from_dict(f) for f in c.get('facts', [])},
-            ref=ref,
-            uid=uid,
-            revoke=c.get('revoke', False)
+            uuid=c['uuid'],
+            revoke=bool(c.get('revoke', False))
         )
 
 
@@ -43,9 +37,11 @@ class ChangeSet:
     created: datetime.datetime
     query: str
     changes: List[Change]
+    applied: bool = False
+    replicated: bool = False
 
     def changes_as_dict(self) -> List[Dict[str, Any]]:
-        return [c.to_dict() for c in self.changes]
+        return sorted([c.to_dict() for c in self.changes], key=repr)
 
     @classmethod
     def changes_from_dict(cls, changes: List[Dict[str, Any]]) -> List[Change]:

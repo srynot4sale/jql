@@ -22,7 +22,7 @@ def test_basic_changesets_call(db: Client) -> str:
     - q: "CHANGESETS"
       result:
         - db:
-            content: '[{"facts": [{"tag": "todo", "prop": "completed", "value": "", "tx": null}], "ref": "??????", "uid": null, "revoke": false}]'
+            content: '[{"facts": [{"tag": "todo", "prop": "completed", "value": "", "tx": null}], "uuid": "????????", "revoke": false}]'
           _tx:
             created: ????-??-??
             query: '@a SET #todo/completed'

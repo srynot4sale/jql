@@ -7,8 +7,7 @@ from typing import FrozenSet, List, Iterable, Set, Optional, Tuple
 
 from jql.changeset import ChangeSet
 from jql.store import Store
-from jql.tasks import replicate_changeset
-from jql.types import Content, Fact, Flag, Item, Ref, Value, is_tag, is_flag, is_content, get_ref, has_value, Tag
+from jql.types import Content, Fact, Flag, Item, Ref, Value, is_tag, is_flag, is_content, has_value, Tag
 
 
 class SqliteStore(Store):
@@ -21,7 +20,7 @@ class SqliteStore(Store):
         if not current_version:
             import jql.store.sqlite_migration
             jql.store.sqlite_migration.schema_migration(self._conn)
-        elif current_version < 10:
+        elif current_version < 11:
             raise Exception('Database needs migration run')
 
         # Look for existing salt
@@ -51,11 +50,11 @@ class SqliteStore(Store):
         cur.execute('INSERT INTO idlist (created, uuid, changeset_uuid, archived) VALUES (?, ?, ?, 0)', [created, uids[0], uids[1]])
         itemid = int(cur.lastrowid)
 
-        new_ref = self.id_to_ref(itemid)
+        new_ref = self._id_to_ref(itemid)
         if self._get_item(new_ref):
             raise Exception(f"{new_ref} item should not already exist")
 
-        if itemid != self.ref_to_id(new_ref):
+        if itemid != self._ref_to_id(new_ref):
             raise Exception("Ref and ID do not match")
 
         # Update row in reflist with generated hash
@@ -78,6 +77,18 @@ class SqliteStore(Store):
         if len(facts) == 0:
             return None
         return Item(facts=facts)
+
+    def _uuid_to_ref(self, uuid: str) -> Optional[Fact]:
+        ref = self._conn.execute("SELECT ref FROM idlist WHERE uuid=?", (uuid,)).fetchone()
+        return Ref(ref['ref']) if ref else None
+
+    def _ref_to_uuid(self, ref: Fact) -> Optional[str]:
+        uuid = self._conn.execute("SELECT uuid FROM idlist WHERE ref=?", (ref.value,)).fetchone()
+        return uuid['uuid'] if uuid else None
+
+    def _get_item_by_uuid(self, uuid: str) -> Optional[Item]:
+        ref = self._uuid_to_ref(uuid)
+        return self._get_item(ref) if ref else None
 
     def _get_items(self, search: Iterable[Fact]) -> List[Item]:
         matches = []
@@ -136,28 +147,37 @@ class SqliteStore(Store):
 
         return matches
 
-    def _create_item(self, changeset_ref: Fact, item: Item) -> Item:
-        self._add_facts(changeset_ref, get_ref(item), item.facts, create=True)
+    def _create_item(self, changeset_ref: Fact, uid: str, item: Item) -> Item:
+        self._add_facts(changeset_ref, uid, item.facts, create=True)
         return item
 
-    def _update_item(self, changeset_ref: Fact, ref: Fact, new_facts: Set[Fact]) -> Item:
-        self._add_facts(changeset_ref, ref, frozenset(new_facts))
-        updated_item = self._get_item(ref)
+    def _update_item(self, changeset_ref: Fact, uid: str, new_facts: Set[Fact]) -> Item:
+        self._add_facts(changeset_ref, uid, frozenset(new_facts))
+        updated_item = self._get_item_by_uuid(uid)
         if not updated_item:
             raise Exception("Updated item not found")
         return updated_item
 
-    def _revoke_item_facts(self, changeset_ref: Fact, ref: Fact, revoke: Set[Fact]) -> Item:
-        self._add_facts(changeset_ref, ref, frozenset(revoke), revoke=True)
-        updated_item = self._get_item(ref)
+    def _revoke_item_facts(self, changeset_ref: Fact, uid: str, revoke: Set[Fact]) -> Item:
+        self._add_facts(changeset_ref, uid, frozenset(revoke), revoke=True)
+        updated_item = self._get_item_by_uuid(uid)
         if not updated_item:
             raise Exception("Updated item not found")
         return updated_item
 
-    def _add_facts(self, changeset_ref: Fact, ref: Fact, facts: FrozenSet[Fact], revoke: bool = False, create: bool = False) -> None:
+    def _add_facts(self, changeset_ref: Fact, uid: str, facts: FrozenSet[Fact], revoke: bool = False, create: bool = False) -> None:
         cur = self._conn.cursor()
-        dbid, archived = cur.execute("SELECT rowid, archived FROM idlist WHERE ref=?", (ref.value,)).fetchone()
-        csid, = cur.execute("SELECT rowid FROM transactions WHERE ref=?", (changeset_ref.value,)).fetchone()
+        res = cur.execute("SELECT rowid, archived FROM idlist WHERE uuid=? OR changeset_uuid=?", (uid, uid)).fetchone()
+        if not res:
+            raise Exception(f'Could not find item {uid} to update')
+        dbid = res['rowid']
+        archived = res['archived']
+
+        res = cur.execute("SELECT rowid FROM transactions WHERE ref=?", (changeset_ref.value,)).fetchone()
+        if not res:
+            raise Exception('Could not find transaction')
+        csid = res['rowid']
+
         values = []
 
         archive_changed = None
@@ -171,7 +191,7 @@ class SqliteStore(Store):
 
         # Calculate if we need to change the archived state
         if archive_changed is not None and archive_changed != archived:
-            cur.execute('UPDATE idlist SET archived = 1 WHERE ref = ?', (ref.value, ))
+            cur.execute('UPDATE idlist SET archived = 1 WHERE uuid = ?', (uid, ))
 
         self._conn.commit()
 
@@ -227,21 +247,15 @@ class SqliteStore(Store):
     def _record_changeset(self, changeset: ChangeSet) -> str:
         cur = self._conn.cursor()
         cur.execute('INSERT INTO changesets (uuid, client, created, query, changes, origin, origin_rowid) VALUES (?, ?, ?, ?, ?, ?, ?)', (changeset.uuid, changeset.client, changeset.created, changeset.query, json.dumps(changeset.changes_as_dict()), changeset.origin, changeset.origin_rowid))
-        rowid = int(cur.lastrowid)
         self._conn.commit()
-
-        if self.replicate and changeset.origin == self.uuid:
-            changeset.origin_rowid = rowid
-            replicate_changeset(changeset)
-
         return changeset.uuid
 
     def _load_changeset(self, changeset_uuid: str) -> ChangeSet:
         cur = self._conn.cursor()
-        cur.execute('SELECT uuid, client, created, query, changes, origin, origin_rowid FROM changesets WHERE uuid = ?', (changeset_uuid,))
+        cur.execute('SELECT rowid, uuid, client, created, query, changes, origin, origin_rowid, applied, replicated FROM changesets WHERE uuid = ?', (changeset_uuid,))
         cs = cur.fetchone()
         if not cs:
-            raise Exception(f'Could not find changeset {changeset_uuid}')
+            raise KeyError(f'Could not find changeset {changeset_uuid}')
         return self._changset_from_row(cs)
 
     def _get_changesets_as_items(self) -> List[Item]:
@@ -330,17 +344,43 @@ class SqliteStore(Store):
         cs = cur.execute('SELECT MAX(origin_rowid) AS max FROM changesets WHERE origin = ? GROUP BY origin', (dbuuid,)).fetchone()
         return 0 if not cs else int(cs["max"])
 
+    def _get_unreplicated_changesets(self) -> List[ChangeSet]:
+        cur = self._conn.cursor()
+        res = cur.execute('SELECT uuid, client, created, query, changes, origin, rowid AS origin_rowid, applied, replicated FROM changesets WHERE origin = ? AND applied = 1 AND (replicated = 0 OR replicated IS NULL) ORDER BY rowid', (self.uuid,))
+        changesets = []
+        for row in res:
+            changesets.append(self._changset_from_row(row))
+        return changesets
+
     def _changset_from_row(self, row: sqlite3.Row) -> ChangeSet:
+        rowid = row['origin_rowid']
+        if not rowid and row['origin'] == self.uuid:
+            rowid = row['rowid']
+
         changeset = ChangeSet(
             uuid=row["uuid"],
             client=row["client"],
-            created=row["created"],
+            created=datetime.datetime.fromisoformat(row['created']),
             query=row["query"],
             origin=row["origin"],
-            origin_rowid=row["origin_rowid"],
+            origin_rowid=rowid,
+            applied=bool(row["applied"]),
+            replicated=bool(row["replicated"]),
             changes=ChangeSet.changes_from_dict(json.loads(row["changes"]))
         )
         return changeset
 
     def _fact_from_row(self, row: sqlite3.Row) -> Fact:
         return Fact(tag=row["tag"], prop=row["prop"], value=row["val"], tx=row["tx_ref"] if "tx_ref" in row else None)
+
+    def _update_changeset(self, changeset: ChangeSet, replicated: Optional[bool] = None, applied: Optional[bool] = None) -> None:
+        cur = self._conn.cursor()
+        if replicated is not None:
+            cur.execute('UPDATE changesets SET replicated = ? WHERE uuid = ?', (int(replicated), changeset.uuid))
+            if cur.rowcount != 1:
+                raise Exception(f"Unexpected result when updating changeset '{changeset.uuid}'")
+        if applied is not None:
+            cur.execute('UPDATE changesets SET applied = ? WHERE uuid = ?', (int(applied), changeset.uuid))
+            if cur.rowcount != 1:
+                raise Exception(f"Unexpected result when updating changeset '{changeset.uuid}'")
+        self._conn.commit()
