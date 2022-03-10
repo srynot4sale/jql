@@ -11,7 +11,7 @@ from typing import List, Optional, Tuple
 
 from jql.client import Client
 from jql.store.sqlite import SqliteStore
-from jql.types import Item, get_content, get_props, get_ref, get_tags, has_ref, has_sys_tag, has_value, get_facts, single
+from jql.types import Fact, Item, get_content, get_props, get_ref, get_tags, has_ref, has_sys_tag, has_value, get_facts, single
 
 
 if len(sys.argv) > 1:
@@ -66,6 +66,13 @@ session: PromptSession[str] = PromptSession('> ', completer=JqlCompleter(), auto
 shortcuts: List[Tuple[str, str]] = []
 
 
+def fact_sorter(fact: Fact) -> str:
+    text = str(fact)
+    if text.startswith('#_'):
+        text = '#zzz' + text[2:]
+    return text
+
+
 def render_item(item: Item, shortcut: Optional[str] = None) -> HTML:
     output = ''
 
@@ -81,10 +88,10 @@ def render_item(item: Item, shortcut: Optional[str] = None) -> HTML:
     if len(content):
         output += f' {e(content)}'
 
-    for p in get_tags(item):
+    for p in sorted(get_tags(item), key=fact_sorter):
         output += f' <green>{p}</green>'
 
-    for p in get_props(item):
+    for p in sorted(get_props(item), key=fact_sorter):
         output += f' <green>#{p.tag}</green>'
         output += f'/<orange>{p.prop}</orange>'
         if has_value(p):
