@@ -1,9 +1,11 @@
+import json
+import pprint
 import sqlite3
 import sys
 from typing import Any, Dict, List
 
-from jql.types import Ref
-from jql.store.memory import MemoryStore
+from jql.types import Content, fact_from_dict, Fact, Flag, has_flag, Item, Ref, Tag, Value
+from jql.store import Store
 
 
 def schema_migration(conn: sqlite3.Connection) -> None:
@@ -62,7 +64,9 @@ def schema_migration(conn: sqlite3.Connection) -> None:
             query text,
             changes text,
             origin text,
-            origin_rowid int
+            origin_rowid int,
+            applied int,
+            replicated int
         )
     ''')
     if current_version and current_version < 5:
@@ -72,7 +76,14 @@ def schema_migration(conn: sqlite3.Connection) -> None:
         cur.execute('''ALTER TABLE changesets ADD COLUMN origin text''')
         cur.execute('''ALTER TABLE changesets ADD COLUMN origin_rowid int''')
 
+    if current_version and current_version < 11:
+        cur.execute('''ALTER TABLE changesets ADD COLUMN applied int''')
+        cur.execute('''ALTER TABLE changesets ADD COLUMN replicated int''')
+
     cur.execute('''CREATE INDEX IF NOT EXISTS idx_changesets_uuid ON changesets (uuid)''')
+    cur.execute('''CREATE INDEX IF NOT EXISTS idx_changesets_origin ON changesets (origin)''')
+    cur.execute('''CREATE INDEX IF NOT EXISTS idx_changesets_origin_rowid ON changesets (origin_rowid)''')
+    cur.execute('''CREATE INDEX IF NOT EXISTS idx_changesets_replicated ON changesets (replicated)''')
 
     cur.execute('''
                 CREATE VIEW IF NOT EXISTS items
@@ -142,7 +153,7 @@ def schema_migration(conn: sqlite3.Connection) -> None:
                 END
     ''')
 
-    cur.execute('''PRAGMA user_version = 10''')
+    cur.execute('''PRAGMA user_version = 11''')
 
     conn.commit()
 
@@ -162,8 +173,6 @@ def data_migration(conn: sqlite3.Connection) -> None:
     if 'salt' not in config or 'created' not in config:
         raise Exception('missing vital config')
 
-    store = MemoryStore(salt=config['salt'])
-
     # Get idlist
     idlist: List[Dict[str, Any]] = []
     uids = {}
@@ -175,10 +184,10 @@ def data_migration(conn: sqlite3.Connection) -> None:
         if not len(i['ref']):
             raise Exception('missing ref', dict(i))
 
-        if store.ref_to_id(Ref(i['ref'])) != rowid:
+        if Store.ref_to_id(config['salt'], Ref(i['ref'])) != rowid:
             raise Exception('ref does not map to rowid')
 
-        if store.id_to_ref(rowid) != Ref(i['ref']):
+        if Store.id_to_ref(config['salt'], rowid) != Ref(i['ref']):
             raise Exception('ref does not map to rowid')
 
         if not len(i['created']):

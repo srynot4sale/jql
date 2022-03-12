@@ -43,6 +43,8 @@ class ChangeSet:
     created: datetime.datetime
     query: str
     changes: List[Change]
+    applied: bool = False
+    replicated: bool = False
 
     def changes_as_dict(self) -> List[Dict[str, Any]]:
         return sorted([c.to_dict() for c in self.changes], key=repr)

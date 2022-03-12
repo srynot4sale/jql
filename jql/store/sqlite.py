@@ -21,7 +21,7 @@ class SqliteStore(Store):
         if not current_version:
             import jql.store.sqlite_migration
             jql.store.sqlite_migration.schema_migration(self._conn)
-        elif current_version < 10:
+        elif current_version < 11:
             raise Exception('Database needs migration run')
 
         # Look for existing salt
@@ -241,7 +241,7 @@ class SqliteStore(Store):
         cur.execute('SELECT uuid, client, created, query, changes, origin, origin_rowid FROM changesets WHERE uuid = ?', (changeset_uuid,))
         cs = cur.fetchone()
         if not cs:
-            raise Exception(f'Could not find changeset {changeset_uuid}')
+            raise KeyError(f'Could not find changeset {changeset_uuid}')
         return self._changset_from_row(cs)
 
     def _get_changesets_as_items(self) -> List[Item]:
@@ -330,6 +330,14 @@ class SqliteStore(Store):
         cs = cur.execute('SELECT MAX(origin_rowid) AS max FROM changesets WHERE origin = ? GROUP BY origin', (dbuuid,)).fetchone()
         return 0 if not cs else int(cs["max"])
 
+    def _get_unreplicated_changesets(self) -> List[ChangeSet]:
+        cur = self._conn.cursor()
+        res = cur.execute('SELECT uuid, client, created, query, changes, origin, rowid AS origin_rowid, applied, replicated FROM changesets WHERE origin = ? AND applied = 1 AND (replicated = 0 OR replicated IS NULL) ORDER BY rowid', (self.uuid,))
+        changesets = []
+        for row in res:
+            changesets.append(self._changset_from_row(row))
+        return changesets
+
     def _changset_from_row(self, row: sqlite3.Row) -> ChangeSet:
         changeset = ChangeSet(
             uuid=row["uuid"],
@@ -338,9 +346,23 @@ class SqliteStore(Store):
             query=row["query"],
             origin=row["origin"],
             origin_rowid=row["origin_rowid"],
+            applied=bool(row["applied"]),
+            replicated=bool(row["replicated"]),
             changes=ChangeSet.changes_from_dict(json.loads(row["changes"]))
         )
         return changeset
 
     def _fact_from_row(self, row: sqlite3.Row) -> Fact:
         return Fact(tag=row["tag"], prop=row["prop"], value=row["val"], tx=row["tx_ref"] if "tx_ref" in row else None)
+
+    def _update_changeset(self, changeset: ChangeSet, replicated: Optional[bool] = None, applied: Optional[bool] = None) -> None:
+        cur = self._conn.cursor()
+        if replicated is not None:
+            cur.execute('UPDATE changesets SET replicated = ? WHERE uuid = ?', (int(replicated), changeset.uuid))
+            if cur.rowcount != 1:
+                raise Exception(f"Unexpected result when updating changeset '{changeset.uuid}'")
+        if applied is not None:
+            cur.execute('UPDATE changesets SET applied = ? WHERE uuid = ?', (int(applied), changeset.uuid))
+            if cur.rowcount != 1:
+                raise Exception(f"Unexpected result when updating changeset '{changeset.uuid}'")
+        self._conn.commit()

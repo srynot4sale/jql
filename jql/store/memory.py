@@ -169,3 +169,9 @@ class MemoryStore(Store):
 
     def _get_last_ingested_changeset(self, dbuuid: str) -> int:
         return 0
+
+    def _get_unreplicated_changesets(self) -> List[ChangeSet]:
+        return []
+
+    def _update_changeset(self, changeset: ChangeSet, replicated: Optional[bool] = None, applied: Optional[bool] = None) -> None:
+        pass

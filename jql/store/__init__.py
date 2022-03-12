@@ -46,11 +46,24 @@ class Store(ABC):
     def get_changesets(self) -> List[Item]:
         return self._get_changesets_as_items()
 
+    def check_changeset_exists(self, changeset_uuid: str) -> bool:
+        try:
+            self._load_changeset(changeset_uuid)
+            return True
+        except KeyError:
+            return False
+
     def record_changeset(self, changeset: ChangeSet) -> str:
+        if self.check_changeset_exists(changeset.uuid):
+            raise Exception(f"Attempt to record a changeset that already exists! {changeset.uuid}, origin: {changeset.origin}")
         return self._record_changeset(changeset)
 
     def apply_changeset(self, changeset_uuid: str) -> List[Item]:
         changeset = self._load_changeset(changeset_uuid)
+
+        # Make sure we aren't reapplying a changeset
+        if changeset.applied:
+            raise Exception(f"Attempting to re-apply a changeset! {changeset.uuid}, origin: {changeset.origin}")
 
         # Commit changeset
         cs_ref, _ = self._next_ref(changeset.uuid, created=str(changeset.created), changeset=True)
@@ -93,6 +106,10 @@ class Store(ABC):
                 resp.append(self._create_item(cs_ref, new_item))
             else:
                 raise Exception("Unexpected change format")
+
+        # Update applied value for changeset
+        self._update_changeset(changeset, applied=True)
+
         return resp
 
     @classmethod
@@ -162,9 +179,17 @@ class Store(ABC):
         pass
 
     @abstractmethod
+    def _get_unreplicated_changesets(self) -> List[ChangeSet]:
+        pass
+
+    @abstractmethod
     def _get_history(self, ref: Optional[Fact] = None) -> List[Item]:
         pass
 
     @abstractmethod
     def _get_last_ingested_changeset(self, dbuuid: str) -> int:
+        pass
+
+    @abstractmethod
+    def _update_changeset(self, changeset: ChangeSet, replicated: Optional[bool] = None, applied: Optional[bool] = None) -> None:
         pass
