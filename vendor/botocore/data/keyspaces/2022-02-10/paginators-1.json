@@ -1,26 +1,22 @@
 {
   "pagination": {
-    "ListComponents": {
+    "ListKeyspaces": {
       "input_token": "nextToken",
       "output_token": "nextToken",
       "limit_key": "maxResults",
-      "result_key": "entities"
+      "result_key": "keyspaces"
     },
-    "ListThemes": {
+    "ListTables": {
       "input_token": "nextToken",
       "output_token": "nextToken",
       "limit_key": "maxResults",
-      "result_key": "entities"
+      "result_key": "tables"
     },
-    "ExportComponents": {
+    "ListTagsForResource": {
       "input_token": "nextToken",
       "output_token": "nextToken",
-      "result_key": "entities"
-    },
-    "ExportThemes": {
-      "input_token": "nextToken",
-      "output_token": "nextToken",
-      "result_key": "entities"
+      "limit_key": "maxResults",
+      "result_key": "tags"
     }
   }
 }

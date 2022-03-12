@@ -15,7 +15,8 @@ build: ## Build api image
 
 .PHONY: vendorize
 vendorize: ## Update vendorized dependencies
-	venv/bin/pip install --isolated --upgrade -t ./vendor -r requirements.txt
+	rm -Rf ./vendor
+	venv/bin/pip install --isolated -t ./vendor -r requirements.txt
 
 .PHONY: venv
 venv: ## Update virtualenv
