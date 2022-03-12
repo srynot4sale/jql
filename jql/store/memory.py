@@ -27,6 +27,19 @@ class MemoryStore(Store):
     def _get_item(self, ref: Fact) -> Optional[Item]:
         return self._items.get(ref.value, None)
 
+    def _uuid_to_ref(self, uuid: str) -> Optional[Fact]:
+        for ref in self._reflist.values():
+            if ref.uid == uuid:
+                return ref.ref
+        return None
+
+    def _ref_to_uuid(self, ref: Fact) -> Optional[str]:
+        rowid = self._ref_to_id(ref)
+        if rowid in self._reflist:
+            return self._reflist[rowid].uid
+        else:
+            return None
+
     def _get_items(self, search: Iterable[Fact]) -> List[Item]:
         matches = []
         # Loop through every item
@@ -66,7 +79,7 @@ class MemoryStore(Store):
         updated_item = update_item(item, new_facts)
         self._items[get_ref(item).value] = updated_item
         if is_archived(updated_item):
-            self._reflist[self.ref_to_id(ref)].archived = True
+            self._reflist[self._ref_to_id(ref)].archived = True
         return updated_item
 
     def _revoke_item_facts(self, changeset_ref: Fact, ref: Fact, revoke: Set[Fact]) -> Item:
@@ -117,7 +130,7 @@ class MemoryStore(Store):
 
     def _next_ref(self, uid: str, created: str, changeset: bool = False) -> Tuple[Fact, int]:
         new_id = len(self._items.keys())
-        new_ref = self.id_to_ref(new_id)
+        new_ref = self._id_to_ref(new_id)
         if self._get_item(new_ref):
             raise Exception(f"{new_ref} item should not already exist")
         self._reflist[new_id] = MemoryRef(ref=new_ref, uid=uid, archived=False, created=created)

@@ -17,7 +17,7 @@ stores = [
 def test_hash_conversions(test_int: int) -> None:
     hashes = []
     for s in stores:
-        ref = s.id_to_ref(test_int)
+        ref = s._id_to_ref(test_int)
         assert ref.value not in hashes
         hashes.append(ref.value)
-        assert s.ref_to_id(ref) == test_int
+        assert s._ref_to_id(ref) == test_int

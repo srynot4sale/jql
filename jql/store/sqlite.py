@@ -51,11 +51,11 @@ class SqliteStore(Store):
         cur.execute('INSERT INTO idlist (created, uuid, changeset_uuid, archived) VALUES (?, ?, ?, 0)', [created, uids[0], uids[1]])
         itemid = int(cur.lastrowid)
 
-        new_ref = self.id_to_ref(itemid)
+        new_ref = self._id_to_ref(itemid)
         if self._get_item(new_ref):
             raise Exception(f"{new_ref} item should not already exist")
 
-        if itemid != self.ref_to_id(new_ref):
+        if itemid != self._ref_to_id(new_ref):
             raise Exception("Ref and ID do not match")
 
         # Update row in reflist with generated hash

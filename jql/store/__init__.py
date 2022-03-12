@@ -95,11 +95,19 @@ class Store(ABC):
                 raise Exception("Unexpected change format")
         return resp
 
-    def ref_to_id(self, ref: Fact) -> int:
-        return int(self._hashstore.decode(ref.value)[0])
+    @classmethod
+    def ref_to_id(cls, uuid: str, ref: Fact) -> int:
+        return int(Hashids(salt=uuid, alphabet=string.hexdigits[:16], min_length=6).decode(ref.value)[0])
 
-    def id_to_ref(self, i: int) -> Fact:
-        return Ref(self._hashstore.encode(i))
+    @classmethod
+    def id_to_ref(cls, uuid: str, i: int) -> Fact:
+        return Ref(Hashids(salt=uuid, alphabet=string.hexdigits[:16], min_length=6).encode(i))
+
+    def _ref_to_id(self, ref: Fact) -> int:
+        return self.ref_to_id(self.uuid, ref)
+
+    def _id_to_ref(self, i: int) -> Fact:
+        return self.id_to_ref(self.uuid, i)
 
     @abstractmethod
     def _get_tags_as_items(self, prefix: str = '') -> List[Item]:
@@ -111,6 +119,14 @@ class Store(ABC):
 
     @abstractmethod
     def _get_item(self, ref: Fact) -> Optional[Item]:
+        pass
+
+    @abstractmethod
+    def _ref_to_uuid(self, ref: Fact) -> Optional[str]:
+        pass
+
+    @abstractmethod
+    def _uuid_to_ref(self, uuid: str) -> Optional[Fact]:
         pass
 
     @abstractmethod
