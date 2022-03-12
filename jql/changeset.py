@@ -15,7 +15,7 @@ class Change:
 
     def to_dict(self) -> Dict[str, Any]:
         return {
-            'facts': [f._asdict() for f in self.facts],
+            'facts': sorted([f._asdict() for f in self.facts], key=repr),
             'ref': self.ref.value if self.ref else None,
             'uid': self.uid,
             'revoke': self.revoke
@@ -45,7 +45,7 @@ class ChangeSet:
     changes: List[Change]
 
     def changes_as_dict(self) -> List[Dict[str, Any]]:
-        return [c.to_dict() for c in self.changes]
+        return sorted([c.to_dict() for c in self.changes], key=repr)
 
     @classmethod
     def changes_from_dict(cls, changes: List[Dict[str, Any]]) -> List[Change]:
