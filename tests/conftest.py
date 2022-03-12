@@ -1,8 +1,10 @@
 from contextlib import contextmanager
+import os
+import pprint
 import pytest
 import structlog
 from typing import Dict, Generator, Iterator, List, Literal, Union
-
+from unittest import mock
 
 from jql.client import Client
 from jql.store import Store
@@ -90,6 +92,12 @@ def db(request) -> Iterator[dbclass]:  # type: ignore
     wrapper.client = client
     wrapper.store = client.store
     yield wrapper
+
+
+@pytest.fixture
+def replication_enabled(request) -> None:  # type: ignore
+    with mock.patch.dict(os.environ, {"REPLICATE": "True", "INGEST": "True"}):
+        yield
 
 
 def pytest_generate_tests(metafunc) -> None:  # type: ignore

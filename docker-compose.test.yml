@@ -7,8 +7,15 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.test
+    depends_on:
+      - dynamodb
     volumes:
       - "./jql/:/code/jql/:ro"
       - "mypycache:/tmp/mypycache"
+    environment:
+      AWS_ACCESS_KEY_ID: XXX
+      AWS_SECRET_ACCESS_KEY: XXX
+  dynamodb:
+    image: amazon/dynamodb-local
 volumes:
   mypycache:

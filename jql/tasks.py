@@ -2,35 +2,21 @@ import datetime
 import json
 import os
 import structlog
-import queue
-from threading import RLock
-from typing import Any, Dict, TYPE_CHECKING
+from typing import List, TYPE_CHECKING
 from pynamodb.models import Model
 from pynamodb.attributes import (UnicodeAttribute, NumberAttribute, UTCDateTimeAttribute)
-from huey import crontab  # type: ignore
-from huey.contrib.mini import MiniHuey  # type: ignore
 
 from jql.changeset import ChangeSet
-from jql.client import Client
-from jql.types import get_content, Tag
-
-
-taskqueue = MiniHuey()
-taskqueue.start()
 
 if TYPE_CHECKING:
-    TO_REPLICATE: queue.Queue[Any] = queue.Queue()
-else:
-    TO_REPLICATE = queue.Queue()
-
-INGEST_LOCK = RLock()
-LAST_INGESTED: Dict[str, Dict[str, int]] = {}
+    from jql.store import Store
 
 
 class ReplicatedChangesets(Model):
     class Meta:
         table_name = 'Changesets'
         region = 'ap-southeast-2'
+        host = 'http://dynamodb:8000' if os.getenv("DEBUG") else None
 
     db_uuid = UnicodeAttribute(hash_key=True)
     changeset_rowid = NumberAttribute(range_key=True)
@@ -38,96 +24,68 @@ class ReplicatedChangesets(Model):
     content = UnicodeAttribute()
 
 
-@taskqueue.task()  # type: ignore
-def replicate_changeset(changeset: ChangeSet) -> None:
-    global TO_REPLICATE
+class Replicator:
+    def __init__(self, store: 'Store') -> None:
+        self._store = store
+        self._log = structlog.get_logger('Replicator')
+        self._setup = False
 
-    task_log = structlog.get_logger()
-    task_log = task_log.bind(task='replicate_changeset')
-    TO_REPLICATE.put(changeset)
+    def setup(self) -> None:
+        if self._setup:
+            return
 
-    try:
-        # Ship to dynamodb
+        # Create table if it does not already exist
         if not ReplicatedChangesets.exists():
             ReplicatedChangesets.create_table(read_capacity_units=1, write_capacity_units=1, wait=True)
 
-        while not TO_REPLICATE.empty():
-            cs = TO_REPLICATE.get()
+        self._setup = True
 
+    def replicate_changeset(self, changeset: ChangeSet) -> bool:
+        self.setup()
+        task_log = self._log.bind(task='replicate_changeset', changeset=changeset)
+        try:
+            # Ship to dynamodb
             replicate = {
-                'uuid': cs.uuid,
-                'client': cs.client,
-                'created': str(cs.created),
-                'query': cs.query,
-                'changes': cs.changes_as_dict()
+                'uuid': changeset.uuid,
+                'client': changeset.client,
+                'created': str(changeset.created),
+                'query': changeset.query,
+                'changes': changeset.changes_as_dict()
             }
-            rc = ReplicatedChangesets(cs.origin, cs.origin_rowid, received=datetime.datetime.utcnow(), content=json.dumps(replicate))
+            rc = ReplicatedChangesets(
+                changeset.origin,
+                changeset.origin_rowid,
+                received=datetime.datetime.utcnow(),
+                content=json.dumps(replicate)
+            )
             rc.save()
-            TO_REPLICATE.task_done()
-            task_log.warning(f'Replicated changeset {cs.origin_rowid} - {repr(replicate)}')
+            task_log.info('Replicated changeset successfully')
+            return True
+        except BaseException as e:
+            task_log.exception(e)
+            return False
 
-    except BaseException as e:
-        task_log.exception(e)
+    def ingest_changesets(self, store_uuid: str, since: int) -> List[ChangeSet]:
+        self.setup()
+        task_log = self._log.bind(task='ingest_replication', store_uuid=store_uuid)
+        task_log.info(f'Ingesting changesets since {since}')
+        changesets = []
+        try:
+            for item in ReplicatedChangesets.query(store_uuid, ReplicatedChangesets.changeset_rowid > since):
+                content = json.loads(item.content)
+                changeset = ChangeSet(
+                    uuid=content['uuid'],
+                    origin=item.db_uuid,
+                    origin_rowid=int(item.changeset_rowid),
+                    client=content['client'],
+                    created=datetime.datetime.fromisoformat(content['created']),
+                    query=content['query'],
+                    changes=ChangeSet.changes_from_dict(content['changes'])
+                )
 
+                changesets.append(changeset)
+                task_log.info(f'Loaded changeset {item.changeset_rowid} - {repr(content)}')
+        except BaseException as e:
+            task_log.exception(e)
 
-@taskqueue.task(crontab(minute='*'))  # type: ignore
-def ingest_replication() -> None:
-    global INGEST_LOCK
-    global LAST_INGESTED
-
-    ingest = os.getenv('INGEST', '')
-    if not ingest:
-        return
-
-    task_log = structlog.get_logger()
-    task_log = task_log.bind(task='ingest_replication')
-
-    try:
-        if not INGEST_LOCK.acquire(blocking=False):
-            task_log.error("Cannot acquire INGEST_LOCK")
-            return
-
-        if not ReplicatedChangesets.exists():
-            task_log.error('No replication table to pull from')
-            return
-
-        # Pull from dynamodb
-        for store in Client.get_stores():
-            stuuid = store.uuid
-            sources = store.get_items([Tag('_ingest')])
-
-            if not sources:
-                continue
-
-            if stuuid not in LAST_INGESTED:
-                LAST_INGESTED[stuuid] = {}
-
-            task_log.warning(f'Ingest replication for store {stuuid}')
-            for source in sources:
-                sourceid = get_content(source).value
-                if sourceid not in LAST_INGESTED[stuuid]:
-                    LAST_INGESTED[stuuid][sourceid] = store.get_last_ingested_changeset(sourceid)
-
-                last = LAST_INGESTED[stuuid][sourceid]
-                task_log.warning(f'Ingesting from {sourceid} since {last}')
-                for item in ReplicatedChangesets.query(sourceid, ReplicatedChangesets.changeset_rowid > last):
-                    content = json.loads(item.content)
-                    changeset = ChangeSet(
-                        uuid=content['uuid'],
-                        origin=item.db_uuid,
-                        origin_rowid=int(item.changeset_rowid),
-                        client=content['client'],
-                        created=datetime.datetime.fromisoformat(content['created']),
-                        query=content['query'],
-                        changes=ChangeSet.changes_from_dict(content['changes'])
-                    )
-
-                    cid = store.record_changeset(changeset)
-                    store.apply_changeset(cid)
-                    task_log.warning(f'Ingested changeset {item.changeset_rowid} - {repr(content)}')
-                    LAST_INGESTED[stuuid][sourceid] = int(item.changeset_rowid)
-
-    except BaseException as e:
-        task_log.exception(e)
-    finally:
-        INGEST_LOCK.release()
+        return changesets

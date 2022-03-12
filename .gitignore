@@ -21,3 +21,4 @@ Makefile.local
 /jql.egg-info/
 /venv/
 secrets.env
+docker-compose.override.yml

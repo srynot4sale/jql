@@ -2,9 +2,9 @@ import json
 import pprint
 import sqlite3
 import sys
-from typing import Any, Dict, List
+from typing import Any, Dict
 
-from jql.types import Content, fact_from_dict, Fact, Flag, has_flag, Item, Ref, Tag, Value
+from jql.types import Content, fact_from_dict, Flag, has_flag, Item, Ref, Tag, Value
 from jql.store import Store
 
 
@@ -174,7 +174,7 @@ def data_migration(conn: sqlite3.Connection) -> None:
         raise Exception('missing vital config')
 
     # Get idlist
-    idlist: List[Dict[str, Any]] = []
+    idlist: Dict[str, Any] = {}
     uids = {}
     changeset_uids = {}
     for i in cur.execute("SELECT rowid, * from idlist ORDER BY rowid ASC"):
@@ -201,12 +201,12 @@ def data_migration(conn: sqlite3.Connection) -> None:
         elif i['changeset_uuid']:
             changeset_uids[i['changeset_uuid']] = dict(i)
 
-        idlist.insert(rowid, dict(i))
+        idlist[str(rowid)] = dict(i)
 
     print(f'{len(idlist)} id\'s found')
 
     # Get changesets
-    changesets: List[Dict[str, Any]] = []
+    changesets: Dict[str, Any] = {}
     for c in cur.execute("SELECT rowid, * FROM changesets ORDER BY rowid ASC"):
         rowid = c['rowid']
 
@@ -214,26 +214,28 @@ def data_migration(conn: sqlite3.Connection) -> None:
             raise Exception('should have an uuid', dict(c))
 
         if not c['client'] or ':' not in c['client']:
-            raise Exception('shuold have a client defined', dict(c))
+            raise Exception('should have a client defined', dict(c))
 
         if not c['created']:
             raise Exception('should have a created date assigned', dict(c))
 
-        changesets.insert(rowid, dict(c))
+        changesets[str(rowid)] = dict(c)
 
     print(f'{len(changesets)} changesets found')
 
     try:
         # Review changesets
-        for c in changesets:
+        for r in changesets:
+            c = changesets[r]
             rowid = c['rowid']
             uid = c['uuid']
             created = c['created']
             client = c['client']
             origin = c['origin']
+            applied = c['applied']
 
             if not c['changes']:
-                print('No changes!')
+                raise Exception('No changes!')
                 # Get changes
                 # changes = []
                 # for ch in cur.execute("SELECT rowid, * FROM changes WHERE changeset = ? ORDER BY rowid ASC", [rowid]):
@@ -254,6 +256,13 @@ def data_migration(conn: sqlite3.Connection) -> None:
 
             # Get changeset item
             cidl = changeset_uids[uid]
+
+            # If we have a changeset item, applied should be true
+            if not applied:
+                print('Applied should be true for this changeset')
+                cur.execute('UPDATE changesets SET applied = 1 WHERE rowid = ?', (rowid,))
+                applied = True
+
             cidl_rowid = cidl['rowid']
             cidl_created = cidl['created']
             if cidl['uuid'] or not cidl['changeset_uuid']:
@@ -268,8 +277,6 @@ def data_migration(conn: sqlite3.Connection) -> None:
             if not cidl['created']:
                 raise Exception('should have a created date assigned', dict(cidl))
 
-            print(c)
-            print(cidl)
             cs_facts = []
             csfs = [dict(csf) for csf in cur.execute("SELECT rowid, * FROM facts WHERE dbid = ? AND current = 1 ORDER BY rowid ASC", [cidl_rowid])]
             for csf in csfs:
@@ -305,7 +312,6 @@ def data_migration(conn: sqlite3.Connection) -> None:
 
                     if csf['tag'] == '_tx':
                         print('Updating to new style tx tag', csf)
-
                         cur.execute('UPDATE facts SET tag = ?, prop = ? WHERE rowid = ?', [csf['tag'], csf['prop'], csf['rowid']])
 
                 cs_facts.append(csf)
@@ -387,6 +393,79 @@ def data_migration(conn: sqlite3.Connection) -> None:
                 print('No _tx/origin found, so inserting!', cs_facts)
                 cur.execute('INSERT INTO facts (changeset, dbid, tag, prop, val, revoke, current) VALUES (?, ?, ?, ?, ?, ?, ?)', [cidl_rowid, cidl_rowid, '_tx', 'origin', origin, 0, 1])
 
+            # Process changes
+            changes = json.loads(c['changes'])
+            updated_changes = []
+            for original in changes:
+                change = original.copy()
+
+                # facts
+                if 'uuid' not in change.keys() or not change['uuid']:
+                    if 'uid' in change and change['uid']:
+                        change['uuid'] = change['uid']
+                    elif change['ref']:
+                        srowid = Store.ref_to_id(c['origin'], Ref(change['ref']))
+                        if change['ref'] == idlist[str(srowid)]['ref']:
+                            suid = idlist[str(srowid)]['uuid']
+                        else:
+                            pprint.pprint(c)
+                            pprint.pprint(change)
+                            pprint.pprint(idlist[str(srowid)])
+                            raise Exception('No uuid for this ref?')
+                        change['uuid'] = suid
+                    else:
+                        raise Exception('No uid or ref?!')
+
+                if 'uid' in change:
+                    del change['uid']
+                if 'ref' in change:
+                    del change['ref']
+
+                if not change['uuid']:
+                    pprint.pprint(original)
+                    pprint.pprint(change)
+                    raise Exception('Empty uuid!')
+
+                change['revoke'] = bool(change['revoke'])
+
+                facts = {fact_from_dict(f) for f in change['facts']}
+
+                new_facts = set()
+                for f in facts:
+                    if f.tag == 'db':
+                        if f.prop == 'content':
+                            f = Content(f.value)
+                        elif f.prop == 'archived':
+                            f = Flag('_db', 'archived')
+                        elif f.prop == 'archive':
+                            f = Flag('_db', 'archived')
+                        elif f.prop == 'created':
+                            if f.value:
+                                f = Value('_db', 'created', f.value)
+                            else:
+                                f = Value('_db', 'created', created)
+                        elif f.prop == '':
+                            f = Tag('_db')
+                        else:
+                            print(f)
+                            raise Exception('old style fact')
+                    new_facts.add(f)
+
+                # Detect this is a create
+                if original.get('ref'):
+                    # Older changesets didn't include created times
+                    if not has_flag(Item(facts=new_facts), '_db', 'created'):
+                        new_facts.add(Value('_db', 'created', created))
+
+                change['facts'] = sorted([f._asdict() for f in new_facts], key=repr)
+                updated_changes.append(change)
+
+            if changes != updated_changes:
+                cur.execute('UPDATE changesets SET changes = ? WHERE rowid = ?', (json.dumps(updated_changes), rowid))
+                print('Updating changes!')
+            else:
+                print('No changes')
+
         # Review items
         for ui in uids:
             i = uids[ui]
@@ -398,50 +477,49 @@ def data_migration(conn: sqlite3.Connection) -> None:
             if not i['created']:
                 raise Exception('should have a created date assigned', dict(i))
 
-            print(i)
+            # print(i)
             fs = [dict(f) for f in cur.execute("SELECT rowid, * FROM facts WHERE dbid = ? ORDER BY rowid ASC", [rowid])]
-            for f in fs:
-
-                if f['changeset'] == rowid:
+            for fi in fs:
+                if fi['changeset'] == rowid:
                     raise Exception('Normal items should NOT refer to themselves as their changeset', i)
 
-                if f['tag'] == 'db':
-                    f['tag'] = '_db'
+                if fi['tag'] == 'db':
+                    fi['tag'] = '_db'
                     print('Updating to new style db tag', f)
-                    cur.execute('UPDATE facts SET tag = ?, prop = ? WHERE rowid = ?', [f['tag'], f['prop'], f['rowid']])
+                    cur.execute('UPDATE facts SET tag = ?, prop = ? WHERE rowid = ?', [fi['tag'], fi['prop'], fi['rowid']])
 
-                if f['tag'] == 'tx' or f['tag'] == '_tx':
+                if fi['tag'] == 'tx' or fi['tag'] == '_tx':
                     raise Exception('Should not have a tx tag here!', i)
 
-            facts = [dict(f) for f in cur.execute("SELECT rowid, * FROM facts WHERE dbid = ? ORDER BY rowid ASC", [rowid])]
+            fs = [dict(f) for f in cur.execute("SELECT rowid, * FROM facts WHERE dbid = ? ORDER BY rowid ASC", [rowid])]
 
             # Make sure it has the required facts
             found = False
-            for csf in facts:
+            for csf in fs:
                 if csf['tag'] == '_db' and csf['prop'] == 'id':
                     found = True
                     break
 
             if not found:
-                raise Exception('no _db/id found!', facts)
+                raise Exception('no _db/id found!', fs)
 
             found = False
-            for csf in facts:
+            for csf in fs:
                 if csf['tag'] == '_db' and csf['prop'] == 'created':
                     found = True
                     break
 
             if not found:
-                raise Exception('No _db/created found!', facts)
+                raise Exception('No _db/created found!', fs)
 
             found = False
-            for csf in facts:
+            for csf in fs:
                 if csf['tag'] == '_db' and csf['prop'] == 'archived':
                     found = True
                     break
 
             if bool(archived) != found:
-                raise Exception('Archived flag doesn\'t match archived item state!', facts)
+                raise Exception('Archived flag doesn\'t match archived item state!', fs)
 
     except BaseException:
         raise

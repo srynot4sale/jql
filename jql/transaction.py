@@ -73,29 +73,34 @@ class Transaction:
         if not facts:
             raise Exception("No data supplied")
         facts = set(facts)
-
         self.start()
         self.log.msg("tx.create_item()", facts=facts)
         if not has_flag(Item(facts=facts), '_db', 'created'):
             facts.add(Value('_db', 'created', str(datetime.datetime.now())))
 
-        self._add_change(Change(uid=str(uuid.uuid4()), facts=facts))
+        self._add_change(Change(uuid=str(uuid.uuid4()), facts=facts))
 
     def revoke_facts(self, ref: Fact, facts: Iterable[Fact]) -> None:
-        facts = set(facts)
         if not facts:
             raise Exception("No data supplied")
+        facts = set(facts)
         self.start()
         self.log.msg("tx.revoke_facts()", ref=ref, facts=facts)
-        self._add_change(Change(ref=ref, facts=facts, revoke=True))
+        uid = self._store._ref_to_uuid(ref)
+        if not uid:
+            raise Exception("Cannot find item")
+        self._add_change(Change(uuid=uid, facts=facts, revoke=True))
 
     def set_facts(self, ref: Fact, facts: Iterable[Fact]) -> None:
-        facts = set(facts)
         if not facts:
             raise Exception("No data supplied")
+        facts = set(facts)
         self.start()
         self.log.msg("tx.set_facts()", ref=ref, facts=facts)
-        self._add_change(Change(ref=ref, facts=facts))
+        uid = self._store._ref_to_uuid(ref)
+        if not uid:
+            raise Exception("Cannot find item")
+        self._add_change(Change(uuid=uid, facts=facts))
 
     def get_item(self, ref: Fact) -> None:
         self.start()
@@ -134,6 +139,11 @@ class Transaction:
 
     def _get_items(self, search: Iterable[Fact]) -> List[Item]:
         return self._store.get_items(search)
+
+    def trigger_replication(self) -> None:
+        self.log.msg('tx.trigger_replication()')
+        self._store.replicate_changesets()
+        self._store.ingest_replication()
 
     def query_to_tree(self, query: str, log_errors: bool = True, replacements: Optional[List[Tuple[str, str]]] = None) -> Tuple[str, List[Fact]]:
         self.log = self.log.bind(query=query)
@@ -208,6 +218,10 @@ class Transaction:
 
         if action == 'changesets':
             self.get_changesets()
+            return self.response
+
+        if action == 'replicate':
+            self.trigger_replication()
             return self.response
 
         raise Exception(f"Unknown query '{query}'")

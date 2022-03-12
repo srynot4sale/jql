@@ -40,6 +40,10 @@ class MemoryStore(Store):
         else:
             return None
 
+    def _get_item_by_uuid(self, uid: str) -> Optional[Item]:
+        ref = self._uuid_to_ref(uid)
+        return self._items.get(ref.value, None) if ref else None
+
     def _get_items(self, search: Iterable[Fact]) -> List[Item]:
         matches = []
         # Loop through every item
@@ -68,22 +72,23 @@ class MemoryStore(Store):
                 matches.append(item)
         return matches
 
-    def _create_item(self, changeset_ref: Fact, item: Item) -> Item:
+    def _create_item(self, changeset_ref: Fact, uid: str, item: Item) -> Item:
         self._items[get_ref(item).value] = item
         return item
 
-    def _update_item(self, changeset_ref: Fact, ref: Fact, new_facts: Set[Fact]) -> Item:
-        item = self._get_item(ref)
+    def _update_item(self, changeset_ref: Fact, uid: str, new_facts: Set[Fact]) -> Item:
+        item = self._get_item_by_uuid(uid)
         if not item:
             raise Exception("Could not find item being updated")
         updated_item = update_item(item, new_facts)
-        self._items[get_ref(item).value] = updated_item
+        ref = get_ref(item)
+        self._items[ref.value] = updated_item
         if is_archived(updated_item):
             self._reflist[self._ref_to_id(ref)].archived = True
         return updated_item
 
-    def _revoke_item_facts(self, changeset_ref: Fact, ref: Fact, revoke: Set[Fact]) -> Item:
-        item = self._get_item(ref)
+    def _revoke_item_facts(self, changeset_ref: Fact, uid: str, revoke: Set[Fact]) -> Item:
+        item = self._get_item_by_uuid(uid)
         if not item:
             raise Exception("Could not find item being updated")
         updated_item = revoke_item_facts(item, revoke)
