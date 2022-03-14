@@ -212,8 +212,14 @@ def get_props(item: Facts) -> Facts:
     return {f for f in item if not is_hidden_sys(f) and is_prop(f)}
 
 
-def get_flags(item: Facts) -> Facts:
-    return {Flag(f.tag, f.prop) for f in get_props(item)}
+def get_flags(item: Facts, for_tag: str = '') -> Facts:
+    """
+    Return all non-hidden flags for an item, optionally filtered by tag
+    """
+    flags = {Flag(f.tag, f.prop) for f in get_props(item)}
+    if len(for_tag):
+        flags = {f for f in flags if f.tag == for_tag}
+    return flags
 
 
 def get_fact(item: Facts, tag: str, prop: str) -> Fact:
