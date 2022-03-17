@@ -97,6 +97,8 @@ failure_examples = [
     # props can't start with a number or underscore
     '@aaa SET #fine/1notfine',
     '@aaa SET #fine/_notfine',
+    # can't specific a tag first after create
+    'CREATE #help This is me',
 ]
 
 
