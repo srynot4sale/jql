@@ -82,6 +82,42 @@ examples = [
         "HINTS #to",
         ["hints", [Tag("to")]]
     ],
+    [
+        "CREATE [[[ Delimited content capture ]]] #help",
+        ["create", [Content("Delimited content capture"), Tag("help")]]
+    ],
+    [
+        "CREATE [[[ This is not a #tag ]]] #help",
+        ["create", [Content("This is not a #tag"), Tag("help")]]
+    ],
+    [
+        "CREATE [[[ This is not the end ] and this is not a #tag ]]] #help",
+        ["create", [Content("This is not the end ] and this is not a #tag"), Tag("help")]]
+    ],
+    [
+        "CREATE [[[ This is not the end ]] and this is not a #tag ]]] #help",
+        ["create", [Content("This is not the end ]] and this is not a #tag"), Tag("help")]]
+    ],
+    [
+        "CREATE [[[ We can now have \n\n multiline!\n content OMG ]]] #help",
+        ["create", [Content("We can now have \n\n multiline!\n content OMG"), Tag("help")]]
+    ],
+    [
+        "CREATE [ OK I'm trying to trick you ]",
+        ["create", [Content("[ OK I'm trying to trick you ]")]]
+    ],
+    [
+        "CREATE [[ OK I'm trying to trick you ]]",
+        ["create", [Content("[[ OK I'm trying to trick you ]]")]]
+    ],
+    [
+        "CREATE OK I'm [[[ trying ]]] to trick you",
+        ["create", [Content("OK I'm [[[ trying ]]] to trick you")]]
+    ],
+    [
+        "CREATE book appointment #todo #todo/location=[[[ 31 Terrace Road,\nCitytown #CAL ]]]",
+        ["create", [Content("book appointment"), Tag("todo"), Value("todo", "location", "31 Terrace Road,\nCitytown #CAL")]]
+    ],
 ]
 
 
@@ -99,6 +135,8 @@ failure_examples = [
     '@aaa SET #fine/_notfine',
     # can't specific a tag first after create
     'CREATE #help This is me',
+    # can't start a quoted content n not finish
+    'CREATE [[[ here is some content thats unfinished',
 ]
 
 
@@ -117,4 +155,7 @@ def test_parser(test: List[Any]) -> None:
 def test_parser_fails(test: str) -> None:
 
     with pytest.raises(Exception):
-        jql_parser.parse(test)
+        res = jql_parser.parse(test)
+        # We only show printed output if the parser doesn't throw
+        # an exception like we are expecting
+        print(res)

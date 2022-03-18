@@ -30,11 +30,15 @@ jql_parser = Lark(r"""
           | data+
           | content data*
 
-    id      : "@" ID
-    tag     : "#" TAG
-    fact    : tag "/" PROP
-    value   : fact "=" /[^ ]+/
-    content : /[^#]+/
+    ?content: quotedtext
+            | simpletext
+
+    id        : "@" ID
+    tag       : "#" TAG
+    fact      : tag "/" PROP
+    value     : fact "=" (/[\S]+/|quotedtext)
+    simpletext: /(?!\s*(\[\[\[|CREATE))([^#\n]+)/
+    quotedtext: /\[\[\[(.*?)\]\]\]/s
 
     ID      : HEXDIGIT+
     HEXDIGIT: "a".."f"|DIGIT
@@ -60,5 +64,13 @@ class JqlTransformer(Transformer[Tree]):  # type: ignore
     def value(self, i: Tuple[Fact, Token]) -> Fact:
         return Value(i[0].tag, i[0].prop, i[1].value)
 
-    def content(self, i: List[Token]) -> Fact:
+    def simpletext(self, i: List[Token]) -> Fact:
         return Content(i[0].value.strip())
+
+    def quotedtext(self, i: List[Token]) -> Fact:
+        match = i[0].value
+        if match.startswith('[[['):
+            match = match[3:]
+        if match.endswith(']]]'):
+            match = match[:-3]
+        return Content(match.strip())
