@@ -1,5 +1,4 @@
 from jql.client import Client
-from jql.store.memory import MemoryStore
 from generator import yamltest
 
 
@@ -34,9 +33,6 @@ def test_basic_changesets_call(db: Client) -> str:
 
 @yamltest
 def test_history(db: Client) -> str:
-    if isinstance(db.store, MemoryStore):
-        return ''
-
     return '''
     - q: "HISTORY"
       result:
@@ -60,9 +56,6 @@ def test_history(db: Client) -> str:
 
 @yamltest
 def test_item_history(db: Client) -> str:
-    if isinstance(db.store, MemoryStore):
-        return ''
-
     return '''
     - q: "CREATE go to supermarket #todo"
       result:

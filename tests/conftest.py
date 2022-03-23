@@ -8,7 +8,6 @@ from unittest import mock
 
 from jql.client import Client
 from jql.store import Store
-from jql.store.memory import MemoryStore
 from jql.store.sqlite import SqliteStore
 from jql.types import get_ref, Fact, Item, Ref
 from jql.transaction import Transaction
@@ -102,7 +101,7 @@ def replication_enabled(request) -> None:  # type: ignore
 
 def pytest_generate_tests(metafunc) -> None:  # type: ignore
     if "db" in metafunc.fixturenames:
-        metafunc.parametrize("db", [MemoryStore, SqliteStore], indirect=True)
+        metafunc.parametrize("db", [SqliteStore], indirect=True)
 
     if "interface" in metafunc.fixturenames:
         metafunc.parametrize("interface", ["query", "api"])

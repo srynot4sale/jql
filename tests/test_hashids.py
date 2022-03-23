@@ -1,15 +1,15 @@
 import pytest
 
-from jql.store.memory import MemoryStore
+from jql.store.sqlite import SqliteStore
 
 
 examples = [1, 2, 3, 5, 10, 35, 543, 1234, 5567, 87678]
 
 stores = [
-    MemoryStore(),
-    MemoryStore(salt="testsalt"),
-    MemoryStore(salt="testdiff"),
-    MemoryStore()
+    SqliteStore(),
+    SqliteStore(salt="testsalt"),
+    SqliteStore(salt="testdiff"),
+    SqliteStore()
 ]
 
 

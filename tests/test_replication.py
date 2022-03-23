@@ -1,14 +1,10 @@
 from conftest import dbclass
 from jql.client import Client
 from jql.types import get_fact, get_value
-from jql.store.memory import MemoryStore
 from jql.store.sqlite import SqliteStore
 
 
 def test_creation_replicates(db: dbclass, replication_enabled: None) -> None:
-    if isinstance(db.store, MemoryStore):
-        return
-
     assert db.store.replicate
 
     db.q("CREATE do dishes #chores")
@@ -39,9 +35,6 @@ def test_creation_replicates(db: dbclass, replication_enabled: None) -> None:
 
 
 def test_basic_ingestion(db: dbclass, replication_enabled: None) -> None:
-    if isinstance(db.store, MemoryStore):
-        return
-
     db.q("CREATE do dishes #chores")
     db.q("CREATE mow lawns #todo #chores")
 
@@ -65,9 +58,6 @@ def test_basic_ingestion(db: dbclass, replication_enabled: None) -> None:
 
 
 def test_basic_ingestion_with_updates(db: dbclass, replication_enabled: None) -> None:
-    if isinstance(db.store, MemoryStore):
-        return
-
     db.q("CREATE do dishes #chores")
     db.q("CREATE mow lawns #todo #chores")
     ref = db.last_ref
