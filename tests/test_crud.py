@@ -377,7 +377,7 @@ def test_list_with_archive(db: Store) -> str:
         - key: a
     - q: "#notrealtag"
       result:
-    - q: "@a SET #_db/archived"
+    - q: "@a ARCHIVE
       result:
         - key: b
           db:

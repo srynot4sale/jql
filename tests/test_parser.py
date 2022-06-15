@@ -63,6 +63,10 @@ examples = [
         ["history", [Ref("f4a")]]
     ],
     [
+        "@f4a ARCHIVE",
+        ["archive", [Ref("f4a")]]
+    ],
+    [
         "#todo/completed",
         ["list", [Flag("todo", "completed")]]
     ],

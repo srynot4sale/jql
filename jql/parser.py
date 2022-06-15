@@ -11,6 +11,7 @@ jql_parser = Lark(r"""
           | "HINTS" prop*                   -> hints
           | "CHANGESETS"                    -> changesets
           | "REPLICATE"                     -> replicate
+          | match "ARCHIVE"                 -> archive
           | match "SET" content             -> set
           | match "SET" data+               -> set
           | match "DEL" data+               -> del

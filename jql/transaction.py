@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from jql.store import Store
 
 from jql.parser import jql_parser, JqlTransformer
-from jql.types import Item, Fact, is_ref, has_flag, Ref, Value
+from jql.types import Item, Fact, Flag, is_ref, has_flag, Ref, Value
 from jql.changeset import Change, ChangeSet
 
 
@@ -184,6 +184,11 @@ class Transaction:
 
         if action == 'create':
             self.create_item(values)
+            self.commit()
+            return self.response
+
+        if action == 'archive':
+            self.set_facts(values[0], [Flag('_db', 'archived')])
             self.commit()
             return self.response
 
