@@ -25,7 +25,7 @@ class Fact(NamedTuple):
             elif not has_value(self):
                 return f'#{self.tag}/{self.prop}'
             else:
-                return f'#{self.tag}/{self.prop}={self.value}'
+                return f'#{self.tag}/{self.prop}={value_wrap(self.value)}'
 
     def __repr__(self) -> str:
         if is_tag(self):
@@ -56,6 +56,15 @@ class Fact(NamedTuple):
 
     def __hash__(self) -> int:
         return hash(self.as_tuple())
+
+
+def value_wrap(value: str) -> str:
+    if not isinstance(value, str) or len(value.strip()) == 0:
+        return ""
+    elif value.isalpha():
+        return value
+    else:
+        return f'[[[ {value} ]]]'
 
 
 Facts = Iterable[Fact]

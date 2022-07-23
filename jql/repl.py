@@ -11,7 +11,7 @@ from typing import List, Optional, Tuple
 
 from jql.client import Client
 from jql.store.sqlite import SqliteStore
-from jql.types import Fact, Item, get_content, get_props, get_ref, get_tags, has_ref, has_sys_tag, has_value, get_facts, single
+from jql.types import Fact, Item, get_content, get_props, get_ref, get_tags, has_ref, has_sys_tag, has_value, get_facts, single, value_wrap
 
 
 if len(sys.argv) > 1:
@@ -95,7 +95,7 @@ def render_item(item: Item, shortcut: Optional[str] = None) -> HTML:
         output += f' <green>#{p.tag}</green>'
         output += f'/<orange>{p.prop}</orange>'
         if has_value(p):
-            output += f'=<yellow>{e(p.value)}</yellow>'
+            output += f'=<yellow>{e(value_wrap(p.value))}</yellow>'
 
     return HTML(output)
 
