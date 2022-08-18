@@ -8,6 +8,7 @@ setup(name='jql',
       author_email='aaron@io.nz',
       license='MIT',
       packages=['jql', 'jql.store'],
+      package_data={'jql': ['jql.lark']},
       install_requires=[
           'lark',
           'structlog',

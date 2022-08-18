@@ -1,0 +1,43 @@
+action: prop* "CREATE" data+            -> create
+      | prop* "CREATE" content data*    -> create
+      | "HINTS" prop*                   -> hints
+      | "CHANGESETS"                    -> changesets
+      | "REPLICATE"                     -> replicate
+      | match "ARCHIVE"                 -> archive
+      | match "SET" content             -> set
+      | match "SET" data+               -> set
+      | match "DEL" data+               -> del
+      | id                              -> get
+      | data+                           -> list
+      | content data*                   -> list
+      | id? "HISTORY"                   -> history
+
+?prop: tag "/"?
+      | fact
+
+?data: tag
+      | fact
+      | value
+
+?match: id
+      | data+
+      | content data*
+
+?content: quotedtext
+        | simpletext
+
+id        : "@" ID
+tag       : "#" TAG
+fact      : tag "/" PROP
+value     : fact "=" (/[\S]+/|quotedtext)
+simpletext: /(?!\s*(\[\[\[|CREATE))([^#\n]+)/
+quotedtext: /\[\[\[(.*?)\]\]\]/s
+
+ID      : HEXDIGIT+
+HEXDIGIT: "a".."f"|DIGIT
+TAG     : "_"? (LCASE_LETTER) (LCASE_LETTER|DIGIT)*
+PROP    : (LCASE_LETTER) ("_"|LCASE_LETTER|DIGIT)*
+%import common.LCASE_LETTER
+%import common.DIGIT
+%import common.WS
+%ignore WS

@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import List, Tuple
 
 from lark import Lark, Transformer, Token, Tree  # type: ignore
@@ -5,51 +6,8 @@ from lark import Lark, Transformer, Token, Tree  # type: ignore
 from jql.types import Fact, Ref, Tag, Flag, Value, Content
 
 
-jql_parser = Lark(r"""
-    action: prop* "CREATE" data+            -> create
-          | prop* "CREATE" content data*    -> create
-          | "HINTS" prop*                   -> hints
-          | "CHANGESETS"                    -> changesets
-          | "REPLICATE"                     -> replicate
-          | match "ARCHIVE"                 -> archive
-          | match "SET" content             -> set
-          | match "SET" data+               -> set
-          | match "DEL" data+               -> del
-          | id                              -> get
-          | data+                           -> list
-          | content data*                   -> list
-          | id? "HISTORY"                   -> history
-
-    ?prop: tag "/"?
-         | fact
-
-    ?data: tag
-         | fact
-         | value
-
-    ?match: id
-          | data+
-          | content data*
-
-    ?content: quotedtext
-            | simpletext
-
-    id        : "@" ID
-    tag       : "#" TAG
-    fact      : tag "/" PROP
-    value     : fact "=" (/[\S]+/|quotedtext)
-    simpletext: /(?!\s*(\[\[\[|CREATE))([^#\n]+)/
-    quotedtext: /\[\[\[(.*?)\]\]\]/s
-
-    ID      : HEXDIGIT+
-    HEXDIGIT: "a".."f"|DIGIT
-    TAG     : "_"? (LCASE_LETTER) (LCASE_LETTER|DIGIT)*
-    PROP    : (LCASE_LETTER) ("_"|LCASE_LETTER|DIGIT)*
-    %import common.LCASE_LETTER
-    %import common.DIGIT
-    %import common.WS
-    %ignore WS
-    """, start='action')
+grammar_file = Path(__file__).parent / 'jql.lark'
+jql_parser = Lark(open(grammar_file), start='action')
 
 
 class JqlTransformer(Transformer[Tree]):  # type: ignore
