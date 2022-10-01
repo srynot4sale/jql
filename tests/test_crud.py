@@ -220,6 +220,18 @@ def test_basic_tags_normalized(db: Store) -> str:
 
 
 @yamltest
+def test_create_with_quotedstring(db: Store) -> str:
+    return '''
+    - q: "CREATE [[[ do dishes ]]] #todo #chores"
+      result:
+        - db:
+            content: do dishes
+          todo:
+          chores:
+    '''
+
+
+@yamltest
 def test_list(db: Store) -> str:
     return '''
     - q: "CREATE do dishes #todo #chores"
@@ -377,7 +389,7 @@ def test_list_with_archive(db: Store) -> str:
         - key: a
     - q: "#notrealtag"
       result:
-    - q: "@a ARCHIVE
+    - q: "@a ARCHIVE"
       result:
         - key: b
           db:

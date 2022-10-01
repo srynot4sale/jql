@@ -61,8 +61,8 @@ def test_basic_ingestion_with_updates(db: dbclass, replication_enabled: None) ->
     db.q("CREATE do dishes #chores")
     db.q("CREATE mow lawns #todo #chores")
     ref = db.last_ref
-    db.q(f"@{ref} UNSET #todo")
-    db.q(f"@{ref} SET #newtag")
+    db.q(f"{ref} DEL #todo")
+    db.q(f"{ref} SET #newtag")
 
     c_res = db.q("CHANGESETS")
     res = db.q("#chores")

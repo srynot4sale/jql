@@ -48,6 +48,9 @@ class SqliteStore(Store):
             uids = [uid, None]
 
         cur.execute('INSERT INTO idlist (created, uuid, changeset_uuid, archived) VALUES (?, ?, ?, 0)', [created, uids[0], uids[1]])
+        if not cur.lastrowid:
+            raise Exception("No row inserted!")
+
         itemid = int(cur.lastrowid)
 
         new_ref = self._id_to_ref(itemid)

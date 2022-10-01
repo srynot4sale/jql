@@ -1,19 +1,16 @@
-action: prop* "CREATE" data+            -> create
-      | prop* "CREATE" content data*    -> create
-      | "HINTS" prop*                   -> hints
+action: "CREATE" data+                  -> create
+      | "CREATE" content data*          -> create
+      | "HINTS" ( tag "/"? | fact )?    -> hints
       | "CHANGESETS"                    -> changesets
       | "REPLICATE"                     -> replicate
       | match "ARCHIVE"                 -> archive
-      | match "SET" content             -> set
       | match "SET" data+               -> set
+      | match "SET" content             -> set
       | match "DEL" data+               -> del
       | id                              -> get
       | data+                           -> list
       | content data*                   -> list
       | id? "HISTORY"                   -> history
-
-?prop: tag "/"?
-      | fact
 
 ?data: tag
       | fact
@@ -21,17 +18,16 @@ action: prop* "CREATE" data+            -> create
 
 ?match: id
       | data+
-      | content data*
 
 ?content: quotedtext
         | simpletext
 
-id        : "@" ID
-tag       : "#" TAG
-fact      : tag "/" PROP
-value     : fact "=" (/[\S]+/|quotedtext)
-simpletext: /(?!\s*(\[\[\[|CREATE))([^#\n]+)/
-quotedtext: /\[\[\[(.*?)\]\]\]/s
+id                  : "@" ID
+value               : fact "=" (/[\S]+/|quotedtext)
+fact                : tag "/" PROP
+tag                 : "#" TAG
+quotedtext          : /\[\[\[(.*?)\]\]\]/s
+simpletext          : /(?<![#@\S])(?!\[\[\[)(?!HINTS)(?!CREATE)((?![#@])[^\n ]+ *)+/s
 
 ID      : HEXDIGIT+
 HEXDIGIT: "a".."f"|DIGIT

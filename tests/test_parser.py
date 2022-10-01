@@ -23,18 +23,6 @@ examples = [
         ["create", [Content("book appointment"), Tag("todo"), Value("todo", "remind_at", "20210412")]]
     ],
     [
-        "#todo CREATE do dishes #chores",
-        ["create", [Tag("todo"), Content("do dishes"), Tag("chores")]]
-    ],
-    [
-        "#todo #chores CREATE do dishes",
-        ["create", [Tag("todo"), Tag("chores"), Content("do dishes")]]
-    ],
-    [
-        "#todo/done CREATE do dishes",
-        ["create", [Flag("todo", "done"), Content("do dishes")]]
-    ],
-    [
         "@d2a SET #todo/completed",
         ["set", [Ref("d2a"), Flag("todo", "completed")]]
     ],
@@ -83,7 +71,15 @@ examples = [
         ["list", [Value("todo", "remind_at", "444")]]
     ],
     [
+        "HINTS",
+        ["hints", []]
+    ],
+    [
         "HINTS #to",
+        ["hints", [Tag("to")]]
+    ],
+    [
+        "HINTS #to/",
         ["hints", [Tag("to")]]
     ],
     [
