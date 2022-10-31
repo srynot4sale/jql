@@ -25,6 +25,9 @@ venv: ## Update virtualenv
 	venv/bin/pip install --upgrade -r requirements.txt
 	venv/bin/pip install --upgrade -r requirements-test.txt
 
+.PHONY: js
+js: ## Generate JS parser
+	venv/bin/lark-js --start action jql/jql.lark -o parser.js
 
 ## Test
 
