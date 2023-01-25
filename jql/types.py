@@ -71,22 +71,27 @@ Facts = Iterable[Fact]
 
 
 def tag_eq(tag: str) -> Callable[[Fact], bool]:
+    "Return a function that checks the tag equals the supplied value"
     return lambda fact: require_fact(fact) and fact.tag == tag
 
 
 def prop_eq(prop: str) -> Callable[[Fact], bool]:
+    "Return a function that checks the prop equals the supplied value"
     return lambda fact: require_fact(fact) and fact.prop == prop
 
 
 def value_eq(value: str) -> Callable[[Fact], bool]:
+    "Return a function that checks the value equals the supplied value"
     return lambda fact: require_fact(fact) and fact.value == value
 
 
 def has_prop(fact: Fact) -> bool:
+    "Checks the fact has a prop set"
     return not prop_eq("")(fact)
 
 
 def has_value(fact: Fact) -> bool:
+    "Checks the fact has a value set"
     return not value_eq("")(fact)
 
 
@@ -99,6 +104,7 @@ def has_sys_tag(fact: Fact) -> bool:
 
 
 def require_fact(fact: Fact) -> bool:
+    "Raise exception if param is not an instance of Fact"
     if not isinstance(fact, Fact):
         raise Exception(f"Expected a Fact, but received a {fact.__class__.__name__}")
     return True
