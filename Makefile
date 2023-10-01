@@ -11,7 +11,7 @@ help:
 
 .PHONY: build
 build: ## Build api image
-	docker-compose -f docker-compose.test.yml build
+	docker compose -f docker-compose.test.yml build
 
 .PHONY: vendorize
 vendorize: ## Update vendorized dependencies
@@ -33,8 +33,8 @@ js: ## Generate JS parser
 
 .PHONY: test
 test: lint ## Run tests
-	docker-compose -f docker-compose.test.yml build
-	docker-compose -f docker-compose.test.yml up jql
+	docker compose -f docker-compose.test.yml build
+	docker compose -f docker-compose.test.yml up jql
 
 .PHONY: lint
 lint: ## Lint code
