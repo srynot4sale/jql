@@ -5,3 +5,22 @@ mirror:
     - eval $(ssh-agent -s)
     - ssh-add <(echo "$PRIVATE_DEPLOY_KEY")
     - git push git@github.com:srynot4sale/jql.git HEAD:master
+
+lint:
+  image: python:3.10.9-slim
+  script:
+    - pip install --upgrade pip wheel
+    - pip install -r requirements.txt
+    - pip install -r requirements-test.txt
+    - RC=0
+    - flake8 || RC=1
+    - mypy -p jql || RC=1
+    - exit $RC
+
+tests:
+  image: docker:latest
+  services:
+    - docker:dind
+  script:
+    - docker compose -f docker-compose.test.yml build
+    - docker compose -f docker-compose.test.yml up --exit-code-from jql jql

@@ -32,14 +32,18 @@ js: ## Generate JS parser
 ## Test
 
 .PHONY: test
-test: lint ## Run tests
-	docker compose -f docker-compose.test.yml build
-	docker compose -f docker-compose.test.yml up jql
+onlytest: test ## Run tests
+	docker compose -f docker-compose.test.yml up --exit-code-from jql jql
+
+.PHONY: dev
+test: lint build onlytest ## Run linter and tests
 
 .PHONY: lint
 lint: ## Lint code
-	venv/bin/flake8
-	venv/bin/mypy -p jql
+	RC=0
+	venv/bin/flake8 || RC=1
+	venv/bin/mypy -p jql || RC=1
+	exit $$RC
 
 
 ## Run
